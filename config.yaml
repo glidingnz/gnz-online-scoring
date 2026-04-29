@@ -1,0 +1,16 @@
+season:
+  start_date: "2024-10-01"
+  end_date: "2025-03-31"
+
+auth:
+  # Add your WeGlide credentials here
+  username: ""  # Optional: leave empty if not needed
+  password: ""  # Optional: leave empty if not needed
+
+island_assignment:
+  # Pilot ID -> island mapping
+  # Format: {pilot_id: "north" | "south"}
+  # Populated from external data source
+  100: "north"
+  200: "south"
+  300: "south"
