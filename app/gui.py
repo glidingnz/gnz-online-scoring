@@ -259,6 +259,20 @@ class GNZViewer(tk.Tk):
 
         self.paned.add(right_frame, weight=2)
 
+        # Output log (scrollable, 10 rows)
+        self.output_frame = tk.Frame(self, height=150)
+        self.output_frame.pack(fill="x", padx=10, pady=5)
+        self.output_frame.pack_propagate(False)
+
+        tk.Label(self.output_frame, text="Output", font=("Arial", 9, "bold")).pack(anchor="w")
+
+        self.output_text = tk.Text(self.output_frame, height=10, width=80, wrap="none", font=("Courier", 9))
+        self.output_text.pack(side="left", fill="both", expand=True)
+
+        output_scrollbar = ttk.Scrollbar(self.output_frame, orient="vertical", command=self.output_text.yview)
+        output_scrollbar.pack(side="right", fill="y")
+        self.output_text.configure(yscrollcommand=output_scrollbar.set)
+
         # Status bar (thin at bottom)
         self.status_bar = tk.Label(self, text="", fg="red", font=("Arial", 9), anchor="w")
         self.status_bar.pack(fill="x", padx=10, pady=(0, 5))
@@ -372,57 +386,67 @@ class GNZViewer(tk.Tk):
 
     def _download_data(self):
         try:
-            import requests
-
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            }
-
             self.output_path.mkdir(parents=True, exist_ok=True)
 
-            # Download north island
             if self.is_closing:
                 return
 
-            self._update_progress("Downloading north island...")
-            r = requests.get(
-                "https://api.weglide.org/v1/flight",
-                params={"limit": 100, "country_id_in": "NZ"},
-                headers=headers,
-                timeout=30
-            )
-
-            # For now, just create placeholder data - in real app would paginate
-            self._update_progress("Processing data...")
-
-            # Create simple test data
-            test_data = [
-                {
-                    "pilot_id": 1,
-                    "pilot_name": "Test Pilot",
-                    "total_points": 100.0,
-                    "flights": [
-                        {"flight_id": 1, "date": "2025-01-01", "points": 100.0, "distance": 100.0, "origin": "Test", "latitude": -37.0, "longitude": 175.0}
-                    ]
-                }
-            ]
-
-            # Save data with season dates
+            # Get dates from GUI
             start_date = self.start_date_entry.get()
             end_date = self.end_date_entry.get()
-            season = {"start": start_date, "end": end_date}
+
+            self._update_progress("Downloading from WeGlide API...")
+
+            # Import and run the CLI season function
+            from main import run_season
+            from pathlib import Path
+            from datetime import date
+            from config import Config, SeasonConfig, AuthConfig
             
-            # Add season to each pilot record
-            north_data = [{"season": season, **p} for p in test_data]
-            south_data = [{"season": season}]
+            # Create config in memory (dates from GUI)
+            config = Config(
+                season=SeasonConfig(start_date=date.fromisoformat(start_date), end_date=date.fromisoformat(end_date)),
+                auth=AuthConfig()
+            )
             
-            with open(self.output_path / "north_island.json", "w") as f:
-                json.dump(north_data, f)
-            with open(self.output_path / "south_island.json", "w") as f:
-                json.dump(south_data, f)
+            # Save a temp config file for run_season to read
+            import yaml
+            config_path = self.output_path / "temp_config.yaml"
+            with open(config_path, "w") as f:
+                yaml.dump({
+                    "season": {"start_date": start_date, "end_date": end_date},
+                    "auth": {"username": "", "password": ""}
+                }, f)
+            
+            # Run the season (this does all the API calls, pagination, island detection)
+            # Capture stdout to show in GUI
+            import sys
+            from io import StringIO
+            
+            class OutputCapture:
+                def __init__(self, callback):
+                    self.callback = callback
+                    self.buffer = StringIO()
+                def write(self, text):
+                    if text.strip():
+                        self.callback(text.strip())
+                    self.buffer.write(text)
+                def flush(self):
+                    pass
+            
+            old_stdout = sys.stdout
+            sys.stdout = OutputCapture(lambda t: self.after(0, lambda: self._append_output(t)))
+            
+            try:
+                run_season(config_path, mock=False, output_dir=self.output_path, start_date=start_date, end_date=end_date)
+            finally:
+                sys.stdout = old_stdout
+
+            if self.is_closing:
+                return
 
             self.has_data = True
-            self._update_progress("Done! Loading GUI...")
+            self._update_progress("Done! Loading data...")
             if not self.is_closing:
                 self.after(0, self._on_download_complete)
 
@@ -434,6 +458,10 @@ class GNZViewer(tk.Tk):
 
     def _update_progress(self, text: str):
         self.after(0, lambda: self.progress_label.config(text=text))
+
+    def _append_output(self, text: str):
+        self.output_text.insert("end", text + "\n")
+        self.output_text.see("end")
 
     def _on_download_complete(self):
         self.has_data = True

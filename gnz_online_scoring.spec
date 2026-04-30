@@ -7,7 +7,6 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('config.yaml', '.'),
         ('app', 'app'),
     ],
     runtime_hooks=['fix_path.py'],
