@@ -1,1 +1,0 @@
-# WeGlide Client package

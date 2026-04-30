@@ -3,18 +3,25 @@
 block_cipher = None
 
 a = Analysis(
-    ['src/weglide_client/main.py'],
-    pathex=['.'],
+    ['main.py'],
+    pathex=[],
     binaries=[],
     datas=[
         ('config.yaml', '.'),
+        ('app', 'app'),
     ],
     runtime_hooks=['fix_path.py'],
     hiddenimports=[
-        'weglide_client',
         'requests',
         'yaml',
         'pydantic',
+        'tkinter',
+        'tkinter.ttk',
+        'tkinter.font',
+        'PIL',
+        'PIL.Image',
+        'PIL.ImageTk',
+        'weglide_client',
     ],
     hookspath=[],
     hooksconfig={},

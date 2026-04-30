@@ -4,13 +4,19 @@ import argparse
 import csv
 import json
 import sys
+import os
 from pathlib import Path
 from collections import defaultdict
 from datetime import date
 
-from src.weglide_client.config import load_config
-from src.weglide_client.api_client import WeGlideClient
-from src.weglide_client.polygons import get_island_from_polygon
+# Add path
+_app_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _app_path)
+sys.path.insert(0, os.path.join(_app_path, 'app'))
+
+from config import load_config
+from api_client import WeGlideClient
+from polygons import get_island_from_polygon
 
 
 MAX_FLIGHTS_PER_PILOT_ISLAND = 5
@@ -21,9 +27,16 @@ def get_island(lat: float, lon: float) -> str | None:
     return get_island_from_polygon(lat, lon)
 
 
-def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = None):
+def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = None, start_date: str = None, end_date: str = None):
     """Run the season analysis."""
     config = load_config(config_path)
+    
+    # Override dates if provided
+    if start_date:
+        config.season.start_date = start_date
+    if end_date:
+        config.season.end_date = end_date
+    
     print(f"Season: {config.season.start_date} to {config.season.end_date}")
 
     if mock:
@@ -35,13 +48,15 @@ def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = 
         password=config.auth.password,
     )
 
-    print("Fetching all NZ flights...")
+    print("Fetching all NZ flights between the selected dates...")
     all_flights = []
     page = 0
     while True:
         flights = client.get_flights(
             limit=100,
             offset=page * 100,
+            date_from=config.season.start_date,
+            date_to=config.season.end_date,
         )
         if not flights:
             break
@@ -150,12 +165,14 @@ def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = 
             ]
         }
 
+    season = {"start": str(config.season.start_date), "end": str(config.season.end_date)}
+
     with open(north_json, "w") as f:
-        json.dump([pilot_to_json(pid, flights) for pid, flights in sorted(north_by_pilot.items())], f, indent=2)
+        json.dump([{"season": season}] + [pilot_to_json(pid, flights) for pid, flights in sorted(north_by_pilot.items())], f, indent=2)
     print(f"Written {north_json}")
 
     with open(south_json, "w") as f:
-        json.dump([pilot_to_json(pid, flights) for pid, flights in sorted(south_by_pilot.items())], f, indent=2)
+        json.dump([{"season": season}] + [pilot_to_json(pid, flights) for pid, flights in sorted(south_by_pilot.items())], f, indent=2)
     print(f"Written {south_json}")
 
     unmapped_json = output_dir / "unmapped.json"
@@ -214,19 +231,31 @@ def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = 
     print(f"Written {log_file}")
 
 
-def main():
-    parser = argparse.ArgumentParser(description="WeGlide NZ Season Analysis")
-    parser.add_argument("--config", default="config.yaml", help="Config file path")
-    parser.add_argument("--mock", action="store_true", help="Use mock data")
-    parser.add_argument("--output-dir", type=Path, help="Output directory for JSON/CSV files")
-    args = parser.parse_args()
+def main(args=None):
+    parser = argparse.ArgumentParser(description="GNZ Online Scoring")
+    parser.add_argument("--cli", action="store_true", help="Run in CLI mode (no GUI)")
+    parser.add_argument("--config", default="config.yaml", help="Config file path (CLI mode)")
+    parser.add_argument("--mock", action="store_true", help="Use mock data (CLI mode)")
+    parser.add_argument("--output-dir", type=Path, help="Output directory (CLI mode)")
+    parser.add_argument("--start-date", help="Season start date (YYYY-MM-DD)")
+    parser.add_argument("--end-date", help="Season end date (YYYY-MM-DD)")
+    args = parser.parse_args(args)
 
-    config_path = Path(args.config)
-    if not config_path.exists():
-        print(f"Config file not found: {config_path}", file=sys.stderr)
-        sys.exit(1)
+    if args.cli:
+        # Run CLI mode
+        config_path = Path(args.config)
+        if not config_path.exists():
+            print(f"Config file not found: {config_path}", file=sys.stderr)
+            sys.exit(1)
+        run_season(config_path, mock=args.mock, output_dir=args.output_dir, start_date=args.start_date, end_date=args.end_date)
+    else:
+        # Run GUI mode
+        from gui import main as gui_main
+        gui_main()
 
-    run_season(config_path, mock=args.mock, output_dir=args.output_dir)
+
+def _main():
+    pass
 
 
 if __name__ == "__main__":

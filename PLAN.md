@@ -3,9 +3,8 @@
 ## Completed Features
 
 ### Phase 1: Project Setup
-- [x] pyproject.toml with dependencies
 - [x] config.yaml (simplified to season dates only)
-- [x] src/weglide_nz package
+- [x] app/ folder with source code
 
 ### Phase 2: Core Infrastructure
 - [x] Config loading
@@ -30,6 +29,13 @@
 ### Phase 6: Build System
 - [x] PyInstaller build script
 - [x] Release package with exe + config
+
+### Phase 7: GUI
+- [x] Tkinter GUI viewer with pilot list and flight details
+- [x] Island dropdown (north/south)
+- [x] Date selectors with validation
+- [x] OSM maps with flight locations
+- [x] Preloading maps for faster UX
 
 ## Testing
 ```

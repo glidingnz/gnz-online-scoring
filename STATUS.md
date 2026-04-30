@@ -3,14 +3,13 @@
 ## Current State: Complete
 
 ### Completed ✓
-- pyproject.toml - dependencies configured
 - config.yaml - simplified config (season dates only)
-- `src/weglide_client/` - main package (renamed from weglide_nz)
-  - `__init__.py` - package init
+- `app/` - main source code
   - `config.py` - config loading
   - `api_client.py` - API wrapper with Chrome user-agent
   - `polygons.py` - polygon-based island detection
   - `main.py` - CLI entrypoint
+  - `gui.py` - Tkinter GUI viewer
 - tests/ - 25 tests passing
 
 ### Features
@@ -49,11 +48,14 @@ season:
 ## Usage
 
 ```bash
-# Run with real API
-python -m src.weglide_nz.main
+# Run GUI (default - for viewing data)
+python main.py
 
-# Output to custom directory
-python -m src.weglide_nz.main --output-dir ./output
+# Run CLI mode (download data from WeGlide API)
+python main.py --cli --start-date 2024-10-01 --end-date 2025-03-31
+
+# Run with executable
+release/gnz-online-scoring.exe --cli --start-date 2024-10-01 --end-date 2025-03-31
 ```
 
 ## Build

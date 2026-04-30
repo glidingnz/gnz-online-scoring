@@ -10,8 +10,27 @@ Use cases:
 ## Quick Start
 
 ```bash
-# Run the script to fetch all NZ flights and generate output files
-python -m src.weglide_client.main
+# Run GUI (default - for viewing data)
+python main.py
+
+# Run CLI mode (download data from WeGlide API)
+python main.py --cli --start-date 2024-10-01 --end-date 2025-03-31
+
+# Or use the executable
+release/gnz-online-scoring.exe --cli --start-date 2024-10-01 --end-date 2025-03-31
+```
+
+**Workflow:**
+1. Use CLI mode to download data from WeGlide API
+2. Use GUI to view and explore the downloaded data
+
+## CLI Options
+
+```bash
+--cli                  Run in CLI mode (download data)
+--start-date YYYY-MM-DD  Season start date
+--end-date YYYY-MM-DD    Season end date
+--output-dir PATH      Output directory (default: ./output)
 ```
 
 Output files will be created in `./output/`:
@@ -117,8 +136,8 @@ This creates a `release/` folder containing:
 
 To run the built executable:
 ```bash
-cd release
-./weglide-nz.exe
+cd release/weglide-client
+./gnz-online-scoring.exe
 ```
 
 ### Cross-compilation
