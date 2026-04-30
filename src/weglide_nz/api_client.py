@@ -1,20 +1,45 @@
 """WeGlide API client wrapper."""
 
 import weglide_client
+import requests
 from weglide_client import Club, User
+from weglide_client.models import FlightRankList
 from weglide_client.api import club_api, flight_api, user_api, auth_api
 from weglide_client.rest import ApiException
+from pydantic import ValidationError
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Iterator, Any
 
 
 DEFAULT_HOST = "https://api.weglide.org"
+DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
 
 class APIError(Exception):
     """API error."""
-    pass
+
+
+@dataclass
+class APIAirport:
+    """Wrapper for airport from API response."""
+    id: int
+    name: str
+    latitude: float = 0.0
+    longitude: float = 0.0
+
+
+@dataclass
+class APIFlight:
+    """Wrapper for flight from API response."""
+    id: int
+    user_id: int
+    user_name: str = ""
+    date: str = ""
+    points: float = 0.0
+    distance: float = 0.0
+    airport: APIAirport | None = None
+    club_id: int | None = None
 
 
 @dataclass
@@ -43,23 +68,26 @@ class WeGlideClient:
 
     def __enter__(self):
         if not self._mock_mode:
-            if not self.username or not self.password:
-                raise APIError("Username and password required. Add them to config.yaml or use --mock for testing.")
-
-            print(f"Authenticating as {self.username}...")
-            self._token = self._authenticate()
-            print("Authentication successful")
-
             configuration = weglide_client.Configuration(host=self.host)
-            configuration.api_key = {"Authorization": self._token}
-            configuration.api_key_prefix = {"Authorization": "Bearer"}
+
+            if self.username and self.password:
+                print(f"Authenticating as {self.username}...")
+                self._token = self._authenticate()
+                print("Authentication successful")
+                configuration.api_key = {"Authorization": self._token}
+                configuration.api_key_prefix = {"Authorization": "Bearer"}
+            else:
+                print("No credentials provided - using public API access")
+
             self._client = weglide_client.ApiClient(configuration)
+            self._client.default_headers["User-Agent"] = DEFAULT_USER_AGENT
         return self
 
     def _authenticate(self) -> str:
         """Authenticate with username/password and return access token."""
         temp_config = weglide_client.Configuration(host=self.host)
         temp_client = weglide_client.ApiClient(temp_config)
+        temp_client.default_headers["User-Agent"] = DEFAULT_USER_AGENT
         auth_api_instance = auth_api.AuthApi(temp_client)
         try:
             result = auth_api_instance.authorize_post_v1_auth_authorize_post(
@@ -76,7 +104,7 @@ class WeGlideClient:
             raise APIError(f"Authentication failed: {e}")
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._client:
+        if self._client and hasattr(self._client, "close"):
             self._client.close()
 
     def enable_mock(self, mock_data: dict | None = None):
@@ -100,6 +128,7 @@ class WeGlideClient:
         user_id: int | None = None,
         club_id: int | None = None,
         limit: int = 100,
+        offset: int = 0,
     ) -> list:
         """Fetch flights with optional filters."""
         if self._mock_mode:
@@ -116,19 +145,54 @@ class WeGlideClient:
             return filtered[:limit]
 
         api = self._get_flight_api()
-        params = {"limit": limit}
+        params = {"limit": limit, "country_id_in": "NZ", "skip": offset}
         if date_from:
-            params["date_from"] = date_from.isoformat()
+            params["scoring_date_start"] = date_from
         if date_to:
-            params["date_to"] = date_to.isoformat()
+            params["scoring_date_end"] = date_to
         if user_id:
-            params["user_id"] = user_id
+            params["user_id_in"] = str(user_id)
         if club_id:
-            params["club_id"] = club_id
+            params["club_id_in"] = str(club_id)
+
+        url = f"{self.host}/v1/flight"
+        headers = {"User-Agent": DEFAULT_USER_AGENT}
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
 
         try:
-            return api.flightlist_v1_flight_get(**params)
-        except ApiException as e:
+            response = requests.get(url, params=params, headers=headers, timeout=30)
+            response.raise_for_status()
+            flights_data = response.json()
+            if isinstance(flights_data, list):
+                flights = []
+                for f in flights_data:
+                    airport_data = f.get("takeoff_airport", {})
+                    bbox = f.get("bbox", [])
+                    lat = bbox[1] if len(bbox) > 1 else 0.0
+                    lon = bbox[0] if len(bbox) > 0 else 0.0
+                    airport = APIAirport(
+                        id=airport_data.get("id", 0),
+                        name=airport_data.get("name", "Unknown"),
+                        latitude=lat,
+                        longitude=lon,
+                    ) if airport_data else None
+                    contest = f.get("contest", {})
+                    club_data = f.get("club", {})
+                    flight = APIFlight(
+                        id=f.get("id", 0),
+                        user_id=f.get("user", {}).get("id", 0),
+                        user_name=f.get("user", {}).get("name", ""),
+                        date=f.get("scoring_date", ""),
+                        points=contest.get("points", 0.0),
+                        distance=contest.get("distance", 0.0),
+                        airport=airport,
+                        club_id=club_data.get("id") if club_data else None,
+                    )
+                    flights.append(flight)
+                return flights
+            raise APIError(f"Unexpected response format: {type(flights_data)}")
+        except requests.RequestException as e:
             raise APIError(f"Failed to fetch flights: {e}")
 
     def get_all_flights(

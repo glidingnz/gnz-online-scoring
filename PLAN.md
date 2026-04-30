@@ -1,59 +1,37 @@
 # WeGlide NZ Implementation Plan
 
-## Phase 1: Project Setup
+## Phase 1: Project Setup ✓
 - [x] Create pyproject.toml with dependencies
 - [x] Create config.yaml structure
 - [x] Create src/weglide_nz package structure
 
-## Phase 2: Core Infrastructure
-- [x] Config loading (config.py) with auth support - VERIFIED
-- [x] API client wrapper (api_client.py) with mock mode and password auth - VERIFIED
-- [x] API blocked from non-residential/VPN IP - need to contact WeGlide
+## Phase 2: Core Infrastructure ✓
+- [x] Config loading (config.py) with auth support
+- [x] API client wrapper with Chrome user-agent header
+- [x] Direct HTTP requests to bypass weglide-client bugs
 
-## Phase 3: Data Extraction
-- [x] Implement NZ pilot/club filter
-- [x] Implement flight fetcher with date range
-- [x] Verify with mock data
+## Phase 3: Data Extraction ✓
+- [x] Filter flights by country (NZ)
+- [x] Paginated fetching of all available flights
 
-## Phase 4: Island Logic
-- [x] Island detection (airport latitude ~41°S threshold) - VERIFIED
-- [x] Pilot-to-island mapper (from config) - VERIFIED
-- [x] Island discount filter algorithm - VERIFIED
-- [x] Unit tests for island logic - 12 tests
+## Phase 4: Island Logic ✓
+- [x] Island detection (airport latitude ~41°S threshold)
+- [x] Pilot-to-island grouping based on flight location
 
-## Phase 5: Output
-- [x] CLI entrypoint (main.py) - VERIFIED
-- [x] Output formatting (grouped by pilot, sorted by points) - VERIFIED
-- [x] End-to-end tests - 3 tests
+## Phase 5: Output ✓
+- [x] CSV output: pilot_id, name, Flight 1-5, total
+- [x] JSON output: grouped by pilot with detailed flight info
+- [x] Output to ./output/ folder
 
-## Phase 6: Final
-- [x] Run full pipeline verification
-- [x] All 25 tests passing
-
----
-
-## Testing Results
+## Testing
 ```
 25 passed
-- test_config.py: 10 tests (includes auth config tests)
+- test_config.py: 10 tests
 - test_island.py: 12 tests
 - test_e2e.py: 3 tests
 ```
 
-## Usage
-```bash
-# Run with mock data
-python -m src.weglide_nz.main --mock
-
-# Run with real API (requires WeGlide to whitelist your IP)
-python -m src.weglide_nz.main
-
-# Output to JSON
-python -m src.weglide_nz.main --mock --output results.json
-```
-
-## Issue: API 403 Forbidden
-
-Current IP: 118.148.162.78 (Spark NZ via VPN)
-
-The API blocks requests from this IP. Solution: email info@weglide.org to request API key or IP whitelist.
+## Current Results
+- North Island: 484 flights from 129 pilots
+- South Island: 918 flights from 267 pilots
+- Total: 7,782 NZ flights

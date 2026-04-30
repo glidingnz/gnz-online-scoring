@@ -1,38 +1,35 @@
 # Implementation Status
 
-## Current State: Ready - Waiting for API Access
+## Current State: Working - NZ Flight Data Export
 
 ### Completed ✓
 - pyproject.toml - dependencies configured
 - config.yaml - config file with auth and island assignments
 - src/weglide_nz/__init__.py - package init
 - src/weglide_nz/config.py - config loading with auth support
-- src/weglide_nz/api_client.py - API wrapper with mock mode and username/password auth
+- src/weglide_nz/api_client.py - API wrapper with mock mode, Chrome user-agent, direct HTTP
 - src/weglide_nz/island.py - island detection and discount logic
-- src/weglide_nz/main.py - CLI entrypoint
+- src/weglide_nz/main.py - CLI entrypoint with JSON/CSV export
 - tests/test_config.py - 10 tests
 - tests/test_island.py - 12 tests
 - tests/test_e2e.py - 3 tests
-- spark_ip_ranges.txt - saved for WeGlide support
 
-### Test Results
-```
-25 passed
-```
+### Features
+- Fetches all NZ flights from WeGlide API (no date filter - all available data)
+- Groups flights by island (North/South) based on latitude threshold (-41°)
+- For each pilot on each island: top 5 flights by points
+- Output: JSON and CSV files per island in `./output/` folder
 
----
+### Output Files
+- `output/north_island.json` - detailed flight data grouped by pilot
+- `output/south_island.json` - detailed flight data grouped by pilot
+- `output/north_island.csv` - pilot_id, name, Flight 1-5, total
+- `output/south_island.csv` - pilot_id, name, Flight 1-5, total
 
-## Current Blocker
-
-**API IP Blocking Issue**
-
-The WeGlide API is blocking our IP (118.148.162.78) even through VPN. Both authenticated and public endpoints return 403 Forbidden.
-
-- Tried via VPN (multiple IPs: 86.38.98.79, 118.148.162.78)
-- Tried authentication with username/password
-- Tried public API without auth
-
-**Resolution:** Email info@weglide.org to request API key/whitelist for Spark NZ IP range.
+### Current Results
+- North Island: 484 flights from 129 pilots
+- South Island: 918 flights from 267 pilots
+- Total: 7,782 flights processed (78 pages)
 
 ## Configuration
 

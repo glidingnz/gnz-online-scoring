@@ -1,81 +1,175 @@
 """CLI entrypoint for WeGlide NZ client."""
 
 import argparse
+import csv
 import json
 import sys
 from pathlib import Path
+from collections import defaultdict
+from datetime import date
 
 from src.weglide_nz.config import load_config
 from src.weglide_nz.api_client import WeGlideClient
-from src.weglide_nz.island import Flight, Airport, apply_island_discount
 
 
-def create_mock_flight(flight_id: int, user_id: int, date: str, points: float, lat: float, lon: float, airport_name: str):
-    """Helper to create mock flights."""
-    return Flight(
-        id=flight_id,
-        user_id=user_id,
-        date=date,
-        points=points,
-        airport=Airport(id=flight_id, name=airport_name, latitude=lat, longitude=lon),
-    )
+ISLAND_THRESHOLD = -41.0
+MAX_FLIGHTS_PER_PILOT_ISLAND = 5
 
 
-MOCK_FLIGHTS = [
-    create_mock_flight(1, 100, "2024-10-15", 500.0, -36.8, 174.7, "Auckland"),
-    create_mock_flight(2, 100, "2024-10-16", 300.0, -45.0, 168.7, "Queenstown"),
-    create_mock_flight(3, 100, "2024-10-17", 700.0, -37.0, 174.7, "Auckland"),
-    create_mock_flight(4, 200, "2024-10-20", 450.0, -45.0, 168.7, "Queenstown"),
-    create_mock_flight(5, 200, "2024-10-21", 600.0, -41.3, 174.8, "Wellington"),
-    create_mock_flight(6, 200, "2024-10-22", 200.0, -36.9, 174.8, "Auckland"),
-    create_mock_flight(7, 300, "2024-11-01", 800.0, -45.0, 168.7, "Queenstown"),
-    create_mock_flight(8, 300, "2024-11-02", 100.0, -36.8, 174.7, "Auckland"),
-]
+def get_island(lat: float) -> str:
+    """Determine island from latitude."""
+    return "north" if lat > ISLAND_THRESHOLD else "south"
 
 
-def run_season(config_path: Path, mock: bool = False):
+def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = None):
     """Run the season analysis."""
     config = load_config(config_path)
     print(f"Season: {config.season.start_date} to {config.season.end_date}")
 
-    island_assignment = config.island_assignment
-    if not island_assignment:
-        print("No island assignments configured")
+    if mock:
+        print("Mock mode not supported for this operation")
         return
 
-    if mock:
-        flights = MOCK_FLIGHTS
-        print(f"Using mock data: {len(flights)} flights")
-    else:
-        client = WeGlideClient(
-            username=config.auth.username,
-            password=config.auth.password,
+    client = WeGlideClient(
+        username=config.auth.username,
+        password=config.auth.password,
+    )
+
+    print("Fetching all NZ flights...")
+    all_flights = []
+    page = 0
+    while True:
+        flights = client.get_flights(
+            limit=100,
+            offset=page * 100,
         )
-        with client:
-            print("Fetching flights from API...")
-            flights = list(client.get_all_flights(
-                date_from=config.season.start_date,
-                date_to=config.season.end_date,
-            ))
-            print(f"Fetched {len(flights)} flights")
+        if not flights:
+            break
+        all_flights.extend(flights)
+        print(f"  Fetched page {page + 1}, total: {len(all_flights)}")
+        page += 1
+        if len(flights) < 100:
+            print(f"  Reached end of data at page {page + 1}")
+            break
+        if page > 100:
+            print("  Stopping after 100 pages")
+            break
 
-    result = apply_island_discount(flights, island_assignment)
+    print(f"Total flights: {len(all_flights)}")
 
-    print("\n=== Results ===")
-    for pilot_id, pilot_flights in result.items():
-        print(f"\nPilot {pilot_id}: {len(pilot_flights)} valid flights")
-        for f in pilot_flights:
-            island = "N" if f.airport and f.airport.latitude > -41 else "S"
-            print(f"  - {f.date}: {f.points}pts ({f.airport.name} [{island}])")
+    pilot_flights = defaultdict(lambda: {"north": [], "south": []})
+    pilot_names = {}
+    for flight in all_flights:
+        if not flight.airport or flight.airport.latitude == 0:
+            continue
+        island = get_island(flight.airport.latitude)
+        pilot_names[flight.user_id] = flight.user_name
+        pilot_flights[flight.user_id][island].append(flight)
 
-    return result
+    for pilot_id in pilot_flights:
+        for island in ["north", "south"]:
+            pilot_flights[pilot_id][island].sort(key=lambda f: f.points, reverse=True)
+            pilot_flights[pilot_id][island] = pilot_flights[pilot_id][island][:MAX_FLIGHTS_PER_PILOT_ISLAND]
+
+    north_data = []
+    south_data = []
+
+    for pilot_id, islands in pilot_flights.items():
+        for flight in islands["north"]:
+            north_data.append({
+                "pilot_id": pilot_id,
+                "pilot_name": pilot_names.get(pilot_id, ""),
+                "flight_id": flight.id,
+                "date": flight.date,
+                "points": flight.points,
+                "distance": flight.distance,
+                "origin": flight.airport.name if flight.airport else "Unknown",
+                "latitude": flight.airport.latitude if flight.airport else 0,
+                "longitude": flight.airport.longitude if flight.airport else 0,
+            })
+        for flight in islands["south"]:
+            south_data.append({
+                "pilot_id": pilot_id,
+                "pilot_name": pilot_names.get(pilot_id, ""),
+                "flight_id": flight.id,
+                "date": flight.date,
+                "points": flight.points,
+                "distance": flight.distance,
+                "origin": flight.airport.name if flight.airport else "Unknown",
+                "latitude": flight.airport.latitude if flight.airport else 0,
+                "longitude": flight.airport.longitude if flight.airport else 0,
+            })
+
+    if output_dir is None:
+        output_dir = Path("./output")
+    output_dir.mkdir(exist_ok=True)
+
+    north_json = output_dir / "north_island.json"
+    south_json = output_dir / "south_island.json"
+    north_csv = output_dir / "north_island.csv"
+    south_csv = output_dir / "south_island.csv"
+
+    north_by_pilot = defaultdict(list)
+    for row in north_data:
+        north_by_pilot[row["pilot_id"]].append(row)
+    south_by_pilot = defaultdict(list)
+    for row in south_data:
+        south_by_pilot[row["pilot_id"]].append(row)
+
+    def pilot_to_json(pilot_id, flights):
+        total = sum(f["points"] for f in flights)
+        return {
+            "pilot_id": pilot_id,
+            "pilot_name": flights[0]["pilot_name"] if flights else "",
+            "total_points": round(total, 2),
+            "flights": [
+                {
+                    "flight_id": f["flight_id"],
+                    "date": f["date"],
+                    "points": f["points"],
+                    "distance": f["distance"],
+                    "origin": f["origin"],
+                    "latitude": f["latitude"],
+                    "longitude": f["longitude"],
+                }
+                for f in flights
+            ]
+        }
+
+    with open(north_json, "w") as f:
+        json.dump([pilot_to_json(pid, flights) for pid, flights in sorted(north_by_pilot.items())], f, indent=2)
+    print(f"Written {north_json}")
+
+    with open(south_json, "w") as f:
+        json.dump([pilot_to_json(pid, flights) for pid, flights in sorted(south_by_pilot.items())], f, indent=2)
+    print(f"Written {south_json}")
+
+    for csv_file, data in [(north_csv, north_data), (south_csv, south_data)]:
+        if data:
+            pilot_rows = defaultdict(list)
+            for row in data:
+                pilot_rows[row["pilot_id"]].append(row["points"])
+            with open(csv_file, "w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow(["pilot_id", "name", "Flight 1", "Flight 2", "Flight 3", "Flight 4", "Flight 5", "total"])
+                for pilot_id, points in sorted(pilot_rows.items()):
+                    name = pilot_names.get(pilot_id, f"Pilot {pilot_id}")
+                    row = [pilot_id, name] + points[:5]
+                    total = sum(p for p in points[:5] if p)
+                    row.append(f"{total:.2f}")
+                    writer.writerow(row)
+        print(f"Written {csv_file}")
+
+    print(f"\nSummary:")
+    print(f"  North Island: {len(north_data)} flights from {len(set(d['pilot_id'] for d in north_data))} pilots")
+    print(f"  South Island: {len(south_data)} flights from {len(set(d['pilot_id'] for d in south_data))} pilots")
 
 
 def main():
     parser = argparse.ArgumentParser(description="WeGlide NZ Season Analysis")
     parser.add_argument("--config", default="config.yaml", help="Config file path")
     parser.add_argument("--mock", action="store_true", help="Use mock data")
-    parser.add_argument("--output", help="Output JSON file")
+    parser.add_argument("--output-dir", type=Path, help="Output directory for JSON/CSV files")
     args = parser.parse_args()
 
     config_path = Path(args.config)
@@ -83,15 +177,7 @@ def main():
         print(f"Config file not found: {config_path}", file=sys.stderr)
         sys.exit(1)
 
-    result = run_season(config_path, mock=args.mock)
-
-    if args.output and result:
-        with open(args.output, "w") as f:
-            json.dump(
-                {pid: [{"id": f.id, "date": f.date, "points": f.points, "airport": f.airport.name} for f in flights]
-                 for pid, flights in result.items()},
-                f, indent=2)
-            print(f"Results written to {args.output}")
+    run_season(config_path, mock=args.mock, output_dir=args.output_dir)
 
 
 if __name__ == "__main__":
