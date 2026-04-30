@@ -1,4 +1,4 @@
-# WeGlide NZ Client
+# GNZ Online Scoring
 
 Python client for extracting and analyzing New Zealand glider flights from WeGlide API.
 
@@ -14,6 +14,9 @@ Output files will be created in `./output/`:
 - `south_island.json` - Detailed flight data for South Island pilots
 - `north_island.csv` - Summary CSV for North Island
 - `south_island.csv` - Summary CSV for South Island
+- `unmapped.json` - Flights not in either polygon
+- `errors.txt` - List of unmapped flights
+- `log.txt` - Run summary
 
 ## Configuration
 
@@ -23,10 +26,6 @@ Edit `config.yaml` to set the season date range:
 season:
   start_date: "2024-10-01"
   end_date: "2025-03-31"
-
-auth:
-  username: ""
-  password: ""
 ```
 
 Note: Credentials are optional - the script works without them using public API access.
@@ -60,17 +59,20 @@ Note: Credentials are optional - the script works without them using public API 
 
 ## Island Logic
 
-Flights are grouped by island based on takeoff airport latitude:
-- **North Island**: latitude > -41°
-- **South Island**: latitude < -41°
+Flights are grouped by island based on convex polygon boundaries defined in `polygons.py`:
+- North Island: 5-vertex polygon
+- South Island: 4-vertex polygon
+
+Coordinates are fetched from WeGlide's airport API to determine actual takeoff location.
 
 Each pilot can have up to 5 flights per island, sorted by points (descending).
 
 ## Current Data
 
 The WeGlide database contains 7,782 NZ flights:
-- North Island: 484 flights from 129 pilots
-- South Island: 918 flights from 267 pilots
+- North Island: 584 flights from 159 pilots
+- South Island: 807 flights from 238 pilots
+- Unmapped: 0 flights
 
 ## Testing
 
@@ -80,11 +82,43 @@ python -m pytest tests/ -v
 
 ## Requirements
 
-- Python 3.13+
+- Python 3.9+
 - requests
 - pydantic
+- pyyaml
 
 Install dependencies:
 ```bash
 pip install -e .
 ```
+
+## Building Executable
+
+### Prerequisites
+```bash
+pip install pyinstaller
+```
+
+### Build
+
+```bash
+python build.py
+```
+
+This creates a `release/` folder containing:
+- `gnz-online-scoring.exe` - The executable
+- `config.yaml` - Configuration file
+- `README.md` - This file
+
+To run the built executable:
+```bash
+cd release
+./weglide-nz.exe
+```
+
+### Cross-compilation
+
+- **Windows on Linux**: Use Wine with PyInstaller
+- **Linux on Windows**: Use WSL with PyInstaller
+
+The build script uses `build_output/` as a temp folder - this is cleaned on each build.

@@ -1,35 +1,42 @@
 # Implementation Status
 
-## Current State: Working - NZ Flight Data Export
+## Current State: Complete
 
 ### Completed ✓
 - pyproject.toml - dependencies configured
-- config.yaml - config file with auth and island assignments
+- config.yaml - simplified config (season dates only)
 - src/weglide_nz/__init__.py - package init
-- src/weglide_nz/config.py - config loading with auth support
-- src/weglide_nz/api_client.py - API wrapper with mock mode, Chrome user-agent, direct HTTP
-- src/weglide_nz/island.py - island detection and discount logic
+- src/weglide_nz/config.py - config loading
+- src/weglide_nz/api_client.py - API wrapper with Chrome user-agent, direct HTTP
+- src/weglide_nz/island.py - island detection logic (legacy)
+- src/weglide_nz/polygons.py - polygon-based island detection
 - src/weglide_nz/main.py - CLI entrypoint with JSON/CSV export
-- tests/test_config.py - 10 tests
-- tests/test_island.py - 12 tests
-- tests/test_e2e.py - 3 tests
+- tests/ - 25 tests passing
 
 ### Features
-- Fetches all NZ flights from WeGlide API (no date filter - all available data)
-- Groups flights by island (North/South) based on latitude threshold (-41°)
+- Fetches all NZ flights from WeGlide API
+- Groups flights by island using convex polygon boundaries
+- Uses actual airport coordinates from WeGlide API (not flight bbox)
 - For each pilot on each island: top 5 flights by points
-- Output: JSON and CSV files per island in `./output/` folder
+- Unmapped flights reported in errors.txt and unmapped.json
 
 ### Output Files
-- `output/north_island.json` - detailed flight data grouped by pilot
-- `output/south_island.json` - detailed flight data grouped by pilot
-- `output/north_island.csv` - pilot_id, name, Flight 1-5, total
-- `output/south_island.csv` - pilot_id, name, Flight 1-5, total
+- `output/north_island.json` / `output/north_island.csv`
+- `output/south_island.json` / `output/south_island.csv`
+- `output/unmapped.json` - flights not in either polygon
+- `output/errors.txt` - list of unmapped flights
+- `output/log.txt` - run summary
+
+### Build System
+- `build.py` - builds the executable
+- `release/` - output folder with exe + config + README
+- PyInstaller for cross-platform builds
 
 ### Current Results
-- North Island: 484 flights from 129 pilots
-- South Island: 918 flights from 267 pilots
-- Total: 7,782 flights processed (78 pages)
+- North Island: 584 flights from 159 pilots
+- South Island: 807 flights from 238 pilots
+- Total: 7,782 NZ flights
+- Unmapped: 0 flights (polygon detection working)
 
 ## Configuration
 
@@ -37,28 +44,23 @@
 season:
   start_date: "2024-10-01"
   end_date: "2025-03-31"
-
-auth:
-  username: "your_username"
-  password: "your_password"
-
-island_assignment:
-  100: "north"
-  200: "south"
-  300: "south"
 ```
 
 ## Usage
 
 ```bash
-# With real API (requires WeGlide to whitelist your IP)
+# Run with real API
 python -m src.weglide_nz.main
 
-# With mock data for testing
-python -m src.weglide_nz.main --mock
-
-# Output to JSON
-python -m src.weglide_nz.main --mock --output results.json
+# Output to custom directory
+python -m src.weglide_nz.main --output-dir ./output
 ```
 
-Last updated: 2025-04-28
+## Build
+
+```bash
+python build.py
+# Output: release/ folder
+```
+
+Last updated: 2026-04-30

@@ -10,15 +10,15 @@ from datetime import date
 
 from src.weglide_nz.config import load_config
 from src.weglide_nz.api_client import WeGlideClient
+from src.weglide_nz.polygons import get_island_from_polygon
 
 
-ISLAND_THRESHOLD = -41.0
 MAX_FLIGHTS_PER_PILOT_ISLAND = 5
 
 
-def get_island(lat: float) -> str:
-    """Determine island from latitude."""
-    return "north" if lat > ISLAND_THRESHOLD else "south"
+def get_island(lat: float, lon: float) -> str | None:
+    """Determine island from polygon boundaries."""
+    return get_island_from_polygon(lat, lon)
 
 
 def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = None):
@@ -59,10 +59,23 @@ def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = 
 
     pilot_flights = defaultdict(lambda: {"north": [], "south": []})
     pilot_names = {}
+    unmapped_flights = []
+
     for flight in all_flights:
         if not flight.airport or flight.airport.latitude == 0:
             continue
-        island = get_island(flight.airport.latitude)
+        island = get_island(flight.airport.latitude, flight.airport.longitude)
+        if island is None:
+            unmapped_flights.append({
+                "flight_id": flight.id,
+                "pilot_id": flight.user_id,
+                "pilot_name": flight.user_name,
+                "date": flight.date,
+                "latitude": flight.airport.latitude,
+                "longitude": flight.airport.longitude,
+                "airport": flight.airport.name,
+            })
+            continue
         pilot_names[flight.user_id] = flight.user_name
         pilot_flights[flight.user_id][island].append(flight)
 
@@ -73,6 +86,7 @@ def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = 
 
     north_data = []
     south_data = []
+    unmapped_data = []
 
     for pilot_id, islands in pilot_flights.items():
         for flight in islands["north"]:
@@ -144,6 +158,20 @@ def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = 
         json.dump([pilot_to_json(pid, flights) for pid, flights in sorted(south_by_pilot.items())], f, indent=2)
     print(f"Written {south_json}")
 
+    unmapped_json = output_dir / "unmapped.json"
+    with open(unmapped_json, "w") as f:
+        json.dump(unmapped_flights, f, indent=2)
+    print(f"Written {unmapped_json} ({len(unmapped_flights)} flights)")
+
+    errors_file = output_dir / "errors.txt"
+    with open(errors_file, "w", encoding="utf-8") as f:
+        f.write("Flights not in North or South Island polygons:\n")
+        f.write("=" * 60 + "\n")
+        for uf in unmapped_flights:
+            f.write(f"Flight {uf['flight_id']}: {uf['airport']} ({uf['latitude']:.4f}, {uf['longitude']:.4f})\n")
+            f.write(f"  Pilot: {uf['pilot_name']} ({uf['pilot_id']}), Date: {uf['date']}\n")
+    print(f"Written {errors_file}")
+
     for csv_file, data in [(north_csv, north_data), (south_csv, south_data)]:
         if data:
             pilot_rows = defaultdict(list)
@@ -163,6 +191,27 @@ def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = 
     print(f"\nSummary:")
     print(f"  North Island: {len(north_data)} flights from {len(set(d['pilot_id'] for d in north_data))} pilots")
     print(f"  South Island: {len(south_data)} flights from {len(set(d['pilot_id'] for d in south_data))} pilots")
+    print(f"  Unmapped: {len(unmapped_flights)} flights")
+
+    log_file = output_dir / "log.txt"
+    with open(log_file, "w", encoding="utf-8") as f:
+        f.write("GNZ Online Scoring - Run Summary\n")
+        f.write("=" * 60 + "\n\n")
+        f.write(f"Season: {config.season.start_date} to {config.season.end_date}\n")
+        f.write(f"Total flights processed: {len(all_flights)}\n\n")
+        f.write("Island Breakdown:\n")
+        f.write(f"  North Island: {len(north_data)} flights from {len(set(d['pilot_id'] for d in north_data))} pilots\n")
+        f.write(f"  South Island: {len(south_data)} flights from {len(set(d['pilot_id'] for d in south_data))} pilots\n")
+        f.write(f"  Unmapped (not in polygons): {len(unmapped_flights)} flights\n\n")
+        f.write("Output Files:\n")
+        f.write(f"  - {north_json.name}\n")
+        f.write(f"  - {south_json.name}\n")
+        f.write(f"  - {unmapped_json.name}\n")
+        f.write(f"  - {north_csv.name}\n")
+        f.write(f"  - {south_csv.name}\n")
+        f.write(f"  - {errors_file.name}\n")
+        f.write(f"  - {log_file.name}\n")
+    print(f"Written {log_file}")
 
 
 def main():

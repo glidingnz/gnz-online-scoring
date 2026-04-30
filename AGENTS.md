@@ -15,17 +15,9 @@ Create `config.yaml` with:
 season:
   start_date: "2024-10-01"  # Season start (ISO format)
   end_date: "2025-03-31"    # Season end (ISO format)
-
-auth:
-  username: "your_weglide_email"
-  password: "your_password"
-
-island_assignment:
-  # Pilot ID -> island mapping (north/south)
-  # Example: {123: "north", 456: "south"}
-  100: "north"
-  200: "south"
 ```
+
+Note: Credentials are optional - the public API works without authentication.
 
 ## Key API Endpoints
 
@@ -42,31 +34,45 @@ island_assignment:
 
 ## Island Detection Logic
 
-- Get pilot's club from user profile
-- Map club to North/South island (via config/external lookup)
-- For each flight, check `airport.latitude` to determine flight location:
-  - Latitude > ~41S = North Island
-  - Latitude < ~41S = South Island
-- Apply discount: remove flights where pilot's island != flight island, keeping highest-point flights first
+Uses convex polygons defined in `src/weglide_nz/polygons.py`:
+- North Island polygon: 5 vertices
+- South Island polygon: 4 vertices
+
+Coordinates are fetched from WeGlide's airport API (not flight bbox, which is the flight path).
+
+For each flight:
+1. Get airport ID from flight
+2. Fetch airport coordinates from `/v1/airport/{id}`
+3. Check if coordinates fall within either polygon
+4. If neither, log to errors.txt and unmapped.json
+
+Each pilot gets top 5 flights per island, sorted by points (descending).
 
 ## Running
 
 ```bash
-# Run with real API (if IP is whitelisted)
+# Run with real API
 python -m src.weglide_nz.main
+
+# Specify output directory
+python -m src.weglide_nz.main --output-dir ./output
 
 # Run with mock data for testing
 python -m src.weglide_nz.main --mock
+```
 
-# Output to JSON
-python -m src.weglide_nz.main --mock --output results.json
+## Build Executable
+
+```bash
+python build.py
+# Output: release/ folder with weglide-nz.exe + config.yaml
 ```
 
 ## Important Notes
 
-- **API blocking**: Non-residential/VPN IPs get 403 Forbidden. Contact info@weglide.org for API key.
-- **Flight endpoint**: Use `flightlist_v1_flight_get` not `get_flights_v1_flight_get`
-- **Authentication**: Uses OAuth2 password grant. Add credentials to config.yaml.
-- **Mock mode**: `client.enable_mock(data)` for testing without API
-- **Tests**: 25 tests passing. Run with `python -m pytest tests/`
-- **Status**: See STATUS.md and PLAN.md for details
+- Uses Chrome user-agent header to bypass 403 blocking
+- Public API access works without credentials
+- Uses direct HTTP requests (not weglide-client) for better control
+- Fetches actual airport coordinates from `/v1/airport/{id}` endpoint
+- Tests: 25 tests passing. Run with `python -m pytest tests/`
+- Status: See STATUS.md and PLAN.md for details

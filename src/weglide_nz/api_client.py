@@ -65,6 +65,29 @@ class WeGlideClient:
     _mock_mode: bool = False
     _mock_data: dict = field(default_factory=dict)
     _token: str | None = None
+    _airport_cache: dict = field(default_factory=dict)
+
+    def get_airport_coords(self, airport_id: int) -> tuple[float, float] | None:
+        """Fetch airport coordinates from API."""
+        if airport_id in self._airport_cache:
+            return self._airport_cache[airport_id]
+        if self._mock_mode:
+            return None
+        url = f"{self.host}/v1/airport/{airport_id}"
+        headers = {"User-Agent": DEFAULT_USER_AGENT}
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                geom = data.get("geom", {})
+                coords = geom.get("coordinates", [])
+                if len(coords) >= 2:
+                    lon, lat = coords[0], coords[1]
+                    self._airport_cache[airport_id] = (lat, lon)
+                    return (lat, lon)
+        except Exception:
+            pass
+        return None
 
     def __enter__(self):
         if not self._mock_mode:
@@ -168,15 +191,26 @@ class WeGlideClient:
                 flights = []
                 for f in flights_data:
                     airport_data = f.get("takeoff_airport", {})
-                    bbox = f.get("bbox", [])
-                    lat = bbox[1] if len(bbox) > 1 else 0.0
-                    lon = bbox[0] if len(bbox) > 0 else 0.0
+                    airport_id = airport_data.get("id", 0) if airport_data else 0
+
+                    # Try to get actual airport coordinates from API
+                    lat, lon = 0.0, 0.0
+                    if airport_id:
+                        coords = self.get_airport_coords(airport_id)
+                        if coords:
+                            lat, lon = coords
+                        else:
+                            # Fallback to bbox if airport lookup fails
+                            bbox = f.get("bbox", [])
+                            lat = bbox[1] if len(bbox) > 1 else 0.0
+                            lon = bbox[0] if len(bbox) > 0 else 0.0
+
                     airport = APIAirport(
-                        id=airport_data.get("id", 0),
-                        name=airport_data.get("name", "Unknown"),
+                        id=airport_id,
+                        name=airport_data.get("name", "Unknown") if airport_data else "Unknown",
                         latitude=lat,
                         longitude=lon,
-                    ) if airport_data else None
+                    ) if airport_id else None
                     contest = f.get("contest", {})
                     club_data = f.get("club", {})
                     flight = APIFlight(

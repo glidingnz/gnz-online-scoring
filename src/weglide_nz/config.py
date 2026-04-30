@@ -23,7 +23,7 @@ class AuthConfig:
 @dataclass
 class Config:
     season: SeasonConfig
-    island_assignment: Dict[int, str]
+    island_assignment: Dict[int, str] = field(default_factory=dict)
     auth: AuthConfig = field(default_factory=AuthConfig)
 
 
@@ -55,7 +55,7 @@ def parse_config(data: dict) -> Config:
         raise ValueError("start_date must be before end_date")
 
     island_assignment: Dict[int, str] = {}
-    raw_assignment = data.get("island_assignment", {})
+    raw_assignment = data.get("island_assignment") or {}
     for pilot_id, island in raw_assignment.items():
         try:
             pid = int(pilot_id)
