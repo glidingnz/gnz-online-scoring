@@ -2,6 +2,11 @@
 
 Python client for extracting and analyzing New Zealand glider flights from WeGlide API.
 
+Use cases:
+
+- Air NZ XC Award
+- Buckland Trophy
+
 ## Quick Start
 
 ```bash
