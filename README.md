@@ -11,7 +11,7 @@ Use cases:
 
 ```bash
 # Run the script to fetch all NZ flights and generate output files
-python -m src.weglide_nz.main
+python -m src.weglide_client.main
 ```
 
 Output files will be created in `./output/`:

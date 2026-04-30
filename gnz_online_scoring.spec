@@ -3,7 +3,7 @@
 block_cipher = None
 
 a = Analysis(
-    ['src/weglide_nz/main.py'],
+    ['src/weglide_client/main.py'],
     pathex=['.'],
     binaries=[],
     datas=[
@@ -34,7 +34,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='weglide-nz',
+    name='gnz-online-scoring',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

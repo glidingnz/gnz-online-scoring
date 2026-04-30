@@ -5,12 +5,12 @@
 ### Completed ✓
 - pyproject.toml - dependencies configured
 - config.yaml - simplified config (season dates only)
-- src/weglide_nz/__init__.py - package init
-- src/weglide_nz/config.py - config loading
-- src/weglide_nz/api_client.py - API wrapper with Chrome user-agent, direct HTTP
-- src/weglide_nz/island.py - island detection logic (legacy)
-- src/weglide_nz/polygons.py - polygon-based island detection
-- src/weglide_nz/main.py - CLI entrypoint with JSON/CSV export
+- `src/weglide_client/` - main package (renamed from weglide_nz)
+  - `__init__.py` - package init
+  - `config.py` - config loading
+  - `api_client.py` - API wrapper with Chrome user-agent
+  - `polygons.py` - polygon-based island detection
+  - `main.py` - CLI entrypoint
 - tests/ - 25 tests passing
 
 ### Features

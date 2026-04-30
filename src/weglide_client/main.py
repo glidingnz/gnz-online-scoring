@@ -8,9 +8,9 @@ from pathlib import Path
 from collections import defaultdict
 from datetime import date
 
-from src.weglide_nz.config import load_config
-from src.weglide_nz.api_client import WeGlideClient
-from src.weglide_nz.polygons import get_island_from_polygon
+from src.weglide_client.config import load_config
+from src.weglide_client.api_client import WeGlideClient
+from src.weglide_client.polygons import get_island_from_polygon
 
 
 MAX_FLIGHTS_PER_PILOT_ISLAND = 5

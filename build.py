@@ -28,32 +28,36 @@ def main():
         print("Build failed!")
         sys.exit(1)
 
-    # Create release folder
+    # Create release folder with weglide-client subfolder
     print("\n[2/3] Creating release package...")
     if release_folder.exists():
         shutil.rmtree(release_folder)
     release_folder.mkdir(exist_ok=True)
 
+    # Create weglide-client subfolder
+    client_folder = release_folder / "weglide-client"
+    client_folder.mkdir(exist_ok=True)
+
     # Copy executable from build_output folder
     exe_source = project_root / "build_output" / "gnz-online-scoring.exe"
-    exe_dest = release_folder / "gnz-online-scoring.exe"
+    exe_dest = client_folder / "gnz-online-scoring.exe"
     shutil.copy2(exe_source, exe_dest)
 
     # Copy config
     config_source = project_root / "config.yaml"
-    config_dest = release_folder / "config.yaml"
+    config_dest = client_folder / "config.yaml"
     shutil.copy2(config_source, config_dest)
 
     # Copy README
     readme_source = project_root / "README.md"
-    readme_dest = release_folder / "README.md"
+    readme_dest = client_folder / "README.md"
     shutil.copy2(readme_source, readme_dest)
 
     print("\n[3/3] Done!")
     print(f"\nRelease package created at: {release_folder}")
     print(f"\nTo run:")
-    print(f"  cd {release_folder}")
-    print("  .\\weglide-nz.exe")
+    print(f"  cd {client_folder}")
+    print("  .\\gnz-online-scoring.exe")
 
 
 if __name__ == "__main__":

@@ -23,7 +23,7 @@ build = [
 ]
 
 [project.scripts]
-gnz-online-scoring = "src.weglide_nz.main:main"
+gnz-online-scoring = "src.weglide_client.main:main"
 
 [build-system]
 requires = ["setuptools>=61.0"]

@@ -4,9 +4,9 @@ import pytest
 from pathlib import Path
 import tempfile
 
-from src.weglide_nz.config import load_config
-from src.weglide_nz.api_client import WeGlideClient
-from src.weglide_nz.island import Flight, Airport, apply_island_discount
+from src.weglide_client.config import load_config
+from src.weglide_client.api_client import WeGlideClient
+from src.weglide_client.island import Flight, Airport, apply_island_discount
 
 
 MOCK_FLIGHTS = [

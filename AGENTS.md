@@ -34,7 +34,7 @@ Note: Credentials are optional - the public API works without authentication.
 
 ## Island Detection Logic
 
-Uses convex polygons defined in `src/weglide_nz/polygons.py`:
+Uses convex polygons defined in `src/weglide_client/polygons.py`:
 - North Island polygon: 5 vertices
 - South Island polygon: 4 vertices
 
@@ -52,13 +52,13 @@ Each pilot gets top 5 flights per island, sorted by points (descending).
 
 ```bash
 # Run with real API
-python -m src.weglide_nz.main
+python -m src.weglide_client.main
 
 # Specify output directory
-python -m src.weglide_nz.main --output-dir ./output
+python -m src.weglide_client.main --output-dir ./output
 
 # Run with mock data for testing
-python -m src.weglide_nz.main --mock
+python -m src.weglide_client.main --mock
 ```
 
 ## Build Executable
