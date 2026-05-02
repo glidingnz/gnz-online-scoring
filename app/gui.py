@@ -224,7 +224,7 @@ class GNZViewer(tk.Tk):
         self.end_date_entry = tk.Entry(top_frame, width=12)
         self.end_date_entry.pack(side="left", padx=2)
 
-        tk.Label(top_frame, text="Island:", font=("Arial", 12)).pack(side="left", padx=(20, 5))
+        tk.Label(top_frame, text="Island:", font=("Arial", 10)).pack(side="left", padx=(20, 5))
 
         self.island_var = tk.StringVar(value="north")
         self.island_dropdown = ttk.Combobox(
@@ -237,7 +237,7 @@ class GNZViewer(tk.Tk):
         self.island_dropdown.pack(side="left", padx=5)
         self.island_dropdown.bind("<<ComboboxSelected>>", self._on_island_changed)
 
-        tk.Label(top_frame, text="Hide Invalid:", font=("Arial", 10)).pack(side="left", padx=(20, 2))
+        tk.Label(top_frame, text="Hide Invalid Flights:", font=("Arial", 10)).pack(side="left", padx=(20, 2))
         self.hide_invalid_var = tk.BooleanVar(value=False)
         self.hide_invalid_checkbox = tk.Checkbutton(
             top_frame,
@@ -249,7 +249,7 @@ class GNZViewer(tk.Tk):
         self.hide_invalid_label.pack(side="left", padx=5)
 
         # Vertical PanedWindow for resizable rows (top: pilots+flights, bottom: output)
-        self.vpaned = tk.PanedWindow(self, orient="vertical", sashwidth=4, sashrelief="raised", sashpad=3)
+        self.vpaned = tk.PanedWindow(self, orient="vertical", sashwidth=6, sashrelief="raised", sashpad=0, bg="#DDDDDD", bd=0)
         self.vpaned.pack(fill="both", expand=True)
 
         # Top section container (will hold horizontal paned)
@@ -257,7 +257,7 @@ class GNZViewer(tk.Tk):
         self.vpaned.add(self.top_frame)
 
         # Horizontal PanedWindow for pilots | flight details
-        self.paned = tk.PanedWindow(self.top_frame, orient="horizontal", sashwidth=4, sashrelief="raised", sashpad=3)
+        self.paned = tk.PanedWindow(self.top_frame, orient="horizontal", sashwidth=6, sashrelief="raised", sashpad=0, bg="#DDDDDD", bd=0)
         self.paned.pack(fill="both", expand=True)
 
         # Left: Pilot list
@@ -304,7 +304,8 @@ class GNZViewer(tk.Tk):
         # Right: Flight details (5 boxes vertically, scrollable)
         right_frame = tk.Frame(self.paned)
 
-        tk.Label(right_frame, text="Flight Details", font=("Arial", 14, "bold")).pack(anchor="w")
+        self.flight_details_label = tk.Label(right_frame, text="Flight Details", font=("Arial", 14, "bold"))
+        self.flight_details_label.pack(anchor="w")
 
         # Scrollable container using a canvas
         self.flight_container = tk.Frame(right_frame)
@@ -627,17 +628,25 @@ class GNZViewer(tk.Tk):
         """Calculate total points for display."""
         return sum(f.get("points", 0) for f in flights[:5])
 
+    def _sort_pilots(self, pilots):
+        def calc_total(p):
+            flights = self._filter_flights_for_display(p.get("flights", []))
+            return self._calculate_display_total(flights)
+
+        def get_name(p):
+            return p.get("pilot_name", "")
+
+        if self._sort_column == "name":
+            return sorted(pilots, key=get_name, reverse=self._sort_reverse)
+        else:
+            return sorted(pilots, key=calc_total, reverse=self._sort_reverse)
+
     def _populate_pilot_list(self):
         for item in self.pilot_tree.get_children():
             self.pilot_tree.delete(item)
 
         pilots = self.data.get(self.current_island, [])
-
-        def calc_total(pilot):
-            flights = self._filter_flights_for_display(pilot.get("flights", []))
-            return self._calculate_display_total(flights)
-
-        pilots = sorted(pilots, key=calc_total, reverse=True)
+        pilots = self._sort_pilots(pilots)
 
         for pilot in pilots:
             flights = self._filter_flights_for_display(pilot.get("flights", []))
@@ -660,7 +669,7 @@ class GNZViewer(tk.Tk):
             while len(flight_points) < 5:
                 flight_points.append("")
 
-            total = calc_total(pilot)
+            total = self._calculate_display_total(flights)
 
             self.pilot_tree.insert("", "end", tags=tag, values=[
                 pilot.get("pilot_id", ""),
@@ -674,24 +683,22 @@ class GNZViewer(tk.Tk):
 
         index = self.pilot_tree.index(selection[0])
         pilots = self.data.get(self.current_island, [])
-
-        def calc_total(pilot):
-            flights = self._filter_flights_for_display(pilot.get("flights", []))
-            return self._calculate_display_total(flights)
-
-        pilots = sorted(pilots, key=calc_total, reverse=True)
+        pilots = self._sort_pilots(pilots)
 
         if 0 <= index < len(pilots):
             pilot = pilots[index]
             self._show_flight_details(pilot)
 
     def _clear_flight_boxes(self):
+        self.flight_details_label.config(text="Flight Details")
         for box in self.flight_boxes:
             for widget in box.winfo_children():
                 widget.destroy()
             tk.Label(box, text="Select a pilot", fg="gray").pack(pady=20)
 
     def _show_flight_details(self, pilot: dict):
+        self.flight_details_label.config(text=f"Flight Details - {pilot.get('pilot_name', '')}")
+        
         # Use filter for display
         flights = self._filter_flights_for_display(pilot.get("flights", []))
 
