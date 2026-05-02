@@ -1,6 +1,6 @@
 # Implementation Status
 
-## Current State: v0.2.0 Complete ✓
+## Current State: v0.2.1 Complete ✓
 
 ### Source Code
 - `app/` - Main application code
@@ -83,4 +83,4 @@ python main.py
 
 - **2026-05-03**: CSV totals now show correctly when pilots have fewer than 5 flights (points padded to 5 columns, total calculated from non-empty values)
 
-Last updated: 2026-05-03 (v0.2.0 - CSV bug fix: totals now show when fewer than 5 flights)
+Last updated: 2026-05-03 (v0.2.1)

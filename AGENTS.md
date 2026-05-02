@@ -52,6 +52,47 @@ python build.py
 python -m pytest tests/ -v
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for commit conventions.
+
+## Conventional Commits
+
+Use this format for commit messages:
+
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer]
+```
+
+### Types
+
+- **feat**: New feature
+- **fix**: Bug fix
+- **docs**: Documentation only
+- **style**: Code style (formatting, no logic)
+- **refactor**: Code refactoring
+- **test**: Adding/updating tests
+- **chore**: Build, tooling, dependencies
+
+### Examples
+
+```
+fix(csv): handle pilots with fewer than 5 flights
+feat(gui): add hide invalid flights checkbox
+docs(readme): update CLI options table
+refactor(api): extract flight parsing to separate function
+```
+
+### When to use
+
+- Use for all commits (required for release workflow)
+- Commit message describes what changed, not what was done
+- Use imperative mood (add, not added / adding)
+
 ## Version Updates
 
 When releasing a new version:

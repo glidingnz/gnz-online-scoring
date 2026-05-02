@@ -2,6 +2,18 @@
 
 All notable changes to GNZ Online Scoring will be documented in this file.
 
+## [0.2.1] - 2026-05-03
+
+### Added
+- CONTRIBUTING.md with conventional commits and development guide
+
+### Fixed
+- Lint errors (unused imports, bare except handling, f-string fixes)
+- pyproject.toml editable install
+
+### Changed
+- ruff configuration (per-file ignores for PyInstaller imports)
+
 ## [Unreleased]
 
 ### Added

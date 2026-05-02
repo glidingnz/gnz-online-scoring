@@ -1,6 +1,6 @@
 [project]
 name = "gnz-online-scoring"
-version = "0.2.0"
+version = "0.2.1"
 description = "WeGlide client for extracting and analyzing New Zealand glider flights"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -22,8 +22,9 @@ build = [
     "pyinstaller>=6.0.0",
 ]
 
-[project.scripts]
-gnz-online-scoring = "src.weglide_client.main:main"
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
 
 [build-system]
 requires = ["setuptools>=61.0"]
@@ -37,5 +38,8 @@ python_functions = ["test_*"]
 addopts = "-v --tb=short"
 
 [tool.ruff]
-target-version = "py39"
 line-length = 100
+
+[tool.ruff.lint]
+select = ["E402"]
+per-file-ignores = {"app/main.py" = ["E402"], "main.py" = ["E402"]}
