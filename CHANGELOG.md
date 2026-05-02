@@ -14,6 +14,11 @@ All notable changes to GNZ Online Scoring will be documented in this file.
 ### Changed
 - ruff configuration (per-file ignores for PyInstaller imports)
 
+## [0.2.2] - 2026-05-03
+
+### Fixed
+- Remove duplicate run_season call in GUI download (was running twice)
+
 ## [Unreleased]
 
 ### Added
