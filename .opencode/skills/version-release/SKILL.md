@@ -9,7 +9,9 @@ When you ask me to create a new version release, I follow this workflow:
 
 ### Step 1: Check version state
 - Run `git diff pyproject.toml` to check if version already changed
-- If changed: Stop and ask what they're doing
+- If changed: Ask user - is this a continued release or should we reset?
+  - If continuing: use the changed version as-is
+  - If reset: revert pyproject.toml and start fresh
 - If not changed: Continue to Step 2
 
 ### Step 2: Commit code changes

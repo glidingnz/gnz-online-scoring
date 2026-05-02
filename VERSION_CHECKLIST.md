@@ -6,8 +6,10 @@
 git diff pyproject.toml  # Check if version changed
 ```
 
-- **If version changed**: Stop - a release is already in progress. Ask user what they're doing.
-- **If not changed**: Continue to Step 2.
+- **If version changed**: Ask user - is this a continued release or should we reset?
+  - If continuing: use the changed version as-is
+  - If reset: revert pyproject.toml and start fresh
+- **If not changed**: Continue to Step 2
 
 ## Step 2: Commit code changes
 
