@@ -21,7 +21,6 @@ def get_version():
 def main():
     project_root = Path(__file__).parent
     version = get_version()
-    dist_folder = project_root / "dist"
     release_folder = project_root / "release"
 
     print(f"Building WeGlide NZ Client v{version}...")
@@ -57,7 +56,7 @@ def main():
 
     print("\n[3/3] Done!")
     print(f"\nRelease package created at: {release_folder}")
-    print(f"\nTo run:")
+    print("\nTo run:")
     print(f"  cd {release_folder}")
     print(f"  .\\gnz-online-scoring-v{version}.exe")
 

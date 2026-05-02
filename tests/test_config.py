@@ -5,7 +5,7 @@ from datetime import date
 from pathlib import Path
 import tempfile
 
-from src.weglide_client.config import load_config, parse_config, Config, SeasonConfig, AuthConfig
+from src.weglide_client.config import load_config, parse_config
 
 
 class TestParseConfig:

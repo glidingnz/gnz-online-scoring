@@ -4,9 +4,7 @@ import json
 import threading
 from pathlib import Path
 from tkinter import ttk
-from tkinter.font import Font
 from urllib.request import urlopen, Request
-from urllib.error import URLError
 from io import BytesIO
 
 import tkinter as tk
@@ -138,7 +136,7 @@ class GNZViewer(tk.Tk):
 
             # Handle window close properly
             self.protocol("WM_DELETE_WINDOW", self._on_close)
-        except Exception as e:
+        except Exception:
             import traceback
             with open("error.log", "w") as f:
                 traceback.print_exc(file=f)
@@ -312,7 +310,7 @@ class GNZViewer(tk.Tk):
                     if isinstance(data, list):
                         # Filter out any dicts that have "season" key (those are metadata, not pilots)
                         self.data["north"] = [p for p in data if isinstance(p, dict) and "season" not in p]
-            except:
+            except Exception:
                 pass
         
         if south_path.exists():
@@ -321,7 +319,7 @@ class GNZViewer(tk.Tk):
                     data = json.load(f)
                     if isinstance(data, list):
                         self.data["south"] = [p for p in data if isinstance(p, dict) and "season" not in p]
-            except:
+            except Exception:
                 pass
 
     def _update_ui_state(self):
@@ -356,7 +354,7 @@ class GNZViewer(tk.Tk):
                     data = json.load(f)
                     if isinstance(data, list) and len(data) > 0 and "season" in data[0]:
                         self.north_dates = data[0]["season"]
-            except:
+            except Exception:
                 pass
         
         if south_path.exists():
@@ -365,7 +363,7 @@ class GNZViewer(tk.Tk):
                     data = json.load(f)
                     if isinstance(data, list) and len(data) > 0 and "season" in data[0]:
                         self.south_dates = data[0]["season"]
-            except:
+            except Exception:
                 pass
         
         # Update entry fields based on current island
@@ -713,7 +711,7 @@ def main():
     try:
         app = GNZViewer()
         app.mainloop()
-    except Exception as e:
+    except Exception:
         import traceback
         with open("error.log", "w") as f:
             traceback.print_exc(file=f)

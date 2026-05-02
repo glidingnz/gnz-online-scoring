@@ -1,13 +1,11 @@
 """Tests for island detection logic."""
 
-import pytest
 from src.weglide_client.island import (
     get_island_from_latitude,
     detect_flight_island,
     apply_island_discount,
     Flight,
     Airport,
-    LATITUDE_THRESHOLD,
 )
 
 

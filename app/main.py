@@ -7,14 +7,12 @@ import sys
 import os
 from pathlib import Path
 from collections import defaultdict
-from datetime import date
 
 # Add path
 _app_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _app_path)
 sys.path.insert(0, os.path.join(_app_path, 'app'))
 
-from config import Config
 from api_client import WeGlideClient
 from polygons import get_island_from_polygon
 from selection import select_top_flights
@@ -93,7 +91,6 @@ def run_season(config, mock: bool = False, output_dir: Path | None = None):
 
     north_data = []
     south_data = []
-    unmapped_data = []
 
     for pilot_id, islands in pilot_flights.items():
         for flight in islands["north"]:
@@ -247,7 +244,7 @@ def run_season(config, mock: bool = False, output_dir: Path | None = None):
     write_csv(south_csv.parent / "south_island_valid.csv", south_data, include_invalid=False)
     print(f"Written {south_csv.parent / 'south_island_valid.csv'}")
 
-    print(f"\nSummary:")
+    print("\nSummary:")
     print(f"  North Island: {len(north_data)} flights from {len(set(d['pilot_id'] for d in north_data))} pilots")
     print(f"  South Island: {len(south_data)} flights from {len(set(d['pilot_id'] for d in south_data))} pilots")
     print(f"  Unmapped: {len(unmapped_flights)} flights")
@@ -267,9 +264,9 @@ def run_season(config, mock: bool = False, output_dir: Path | None = None):
         f.write(f"  - {south_json.name}\n")
         f.write(f"  - {unmapped_json.name}\n")
         f.write(f"  - {north_csv.name} (all flights)\n")
-        f.write(f"  - north_island_valid.csv (valid only)\n")
+        f.write("  - north_island_valid.csv (valid only)\n")
         f.write(f"  - {south_csv.name} (all flights)\n")
-        f.write(f"  - south_island_valid.csv (valid only)\n")
+        f.write("  - south_island_valid.csv (valid only)\n")
         f.write(f"  - {errors_file.name}\n")
         f.write(f"  - {log_file.name}\n")
     print(f"Written {log_file}")

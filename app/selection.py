@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from app.api_client import APIFlight
+    pass
 
 
 def select_top_flights(flights: list, max_count: int = 5) -> list:

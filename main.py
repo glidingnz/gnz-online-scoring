@@ -2,7 +2,6 @@
 
 import sys
 import os
-from pathlib import Path
 
 # Add path to app
 _app_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))

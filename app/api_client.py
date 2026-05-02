@@ -3,10 +3,8 @@
 import weglide_client
 import requests
 from weglide_client import Club, User
-from weglide_client.models import FlightRankList
 from weglide_client.api import club_api, flight_api, user_api, auth_api
 from weglide_client.rest import ApiException
-from pydantic import ValidationError
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Iterator, Any

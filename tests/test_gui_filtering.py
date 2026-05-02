@@ -1,6 +1,5 @@
 """Tests for GUI flight filtering logic."""
 
-import pytest
 
 
 class TestFilterFlightsForDisplay:

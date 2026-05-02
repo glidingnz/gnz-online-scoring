@@ -1,6 +1,5 @@
 """Tests for flight selection logic."""
 
-import pytest
 
 
 class MockFlight:

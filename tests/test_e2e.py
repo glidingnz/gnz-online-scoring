@@ -1,6 +1,5 @@
 """End-to-end tests for the full workflow."""
 
-import pytest
 from pathlib import Path
 import tempfile
 

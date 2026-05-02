@@ -1,7 +1,6 @@
 """Island detection and filtering logic."""
 
 from dataclasses import dataclass
-from typing import Any
 
 
 LATITUDE_THRESHOLD = -41.0
