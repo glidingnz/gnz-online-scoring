@@ -32,7 +32,7 @@
 4. **Flight Validity**
    - Valid boolean stored in JSON (from WeGlide API)
    - Invalid flights shown in red in GUI
-   - "Hide Invalid" checkbox to filter invalid flights
+   - "Hide Invalid flights" checkbox to filter invalid flights
    - Recalculates totals when filtering
 
 5. **GUI Viewer**

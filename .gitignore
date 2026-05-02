@@ -57,3 +57,9 @@ dmypy.json
 # Build helpers (keep these)
 fix_path.py
 *.spec (keep weglide_nz.spec)
+
+# errors
+error.log
+
+# GUI layout file
+gui_layout.json
