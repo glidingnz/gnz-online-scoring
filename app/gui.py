@@ -419,7 +419,6 @@ class GNZViewer(tk.Tk):
                 auth=AuthConfig()
             )
             
-            run_season(config, mock=False, output_dir=self.output_path)
             # Capture stdout to show in GUI
             import sys
             from io import StringIO
