@@ -1,6 +1,6 @@
 [project]
 name = "gnz-online-scoring"
-version = "0.2.2"
+version = "0.3.0"
 description = "WeGlide client for extracting and analyzing New Zealand glider flights"
 readme = "README.md"
 requires-python = ">=3.9"

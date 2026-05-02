@@ -6,7 +6,7 @@ Python application for extracting and analyzing New Zealand glider flights from 
 
 ## Version
 
-v0.2.2
+v0.3.0
 
 ## Overview
 
