@@ -127,6 +127,7 @@ class GNZViewer(tk.Tk):
             self.has_data = self._check_data_exists()
 
             self._setup_ui()
+            self._restore_layout()
             self._update_ui_state()
             
             # Auto-load pilot list if data exists
@@ -150,10 +151,49 @@ class GNZViewer(tk.Tk):
         return north and south
 
     def _on_close(self):
+        self._save_layout()
         self.is_closing = True
         self.destroy()
         import sys
         sys.exit(0)
+
+    def _save_layout(self):
+        self.update_idletasks()
+        v = self.vpaned.sash_coord(0)
+        h = self.paned.sash_coord(0)
+        layout = {
+            "geometry": self.geometry(),
+            "vpaned": v[1] if v else None,
+            "hpaned": h[0] if h else None,
+        }
+        layout_path = Path("gui_layout.json")
+        with open(layout_path, "w") as f:
+            json.dump(layout, f)
+
+    def _restore_layout(self):
+        layout_path = Path("gui_layout.json")
+        if layout_path.exists():
+            try:
+                with open(layout_path) as f:
+                    layout = json.load(f)
+                geometry = layout.get("geometry")
+                if geometry:
+                    self.geometry(geometry)
+                    self.update_idletasks()
+                self._apply_layout(layout)
+            except Exception:
+                pass
+
+    def _apply_layout(self, layout):
+        try:
+            v = layout.get("vpaned")
+            if v is not None and v > 0:
+                self.vpaned.sash_place(0, 0, v)
+            h = layout.get("hpaned")
+            if h is not None and h > 0:
+                self.paned.sash_place(0, h, 0)
+        except Exception:
+            pass
 
     def _setup_ui(self):
         # Top section: Controls
@@ -208,9 +248,17 @@ class GNZViewer(tk.Tk):
         self.hide_invalid_label = tk.Label(top_frame, text="(->pts<- = invalid, yellow row = has invalid)", font=("Arial", 9), fg="gray")
         self.hide_invalid_label.pack(side="left", padx=5)
 
-        # Main content: PanedWindow for resizable split (vertical - left/right)
-        self.paned = ttk.PanedWindow(self, orient="horizontal")
-        self.paned.pack(fill="both", expand=True, padx=10, pady=5)
+        # Vertical PanedWindow for resizable rows (top: pilots+flights, bottom: output)
+        self.vpaned = tk.PanedWindow(self, orient="vertical", sashwidth=4, sashrelief="raised", sashpad=3)
+        self.vpaned.pack(fill="both", expand=True)
+
+        # Top section container (will hold horizontal paned)
+        self.top_frame = tk.Frame(self.vpaned)
+        self.vpaned.add(self.top_frame)
+
+        # Horizontal PanedWindow for pilots | flight details
+        self.paned = tk.PanedWindow(self.top_frame, orient="horizontal", sashwidth=4, sashrelief="raised", sashpad=3)
+        self.paned.pack(fill="both", expand=True)
 
         # Left: Pilot list
         left_frame = tk.Frame(self.paned, width=400)
@@ -221,13 +269,26 @@ class GNZViewer(tk.Tk):
         columns = ("pilot_id", "name", "flight_1", "flight_2", "flight_3", "flight_4", "flight_5", "total")
         self.pilot_tree = ttk.Treeview(left_frame, columns=columns, show="headings", height=20)
 
+        # Columns that can be sorted
+        sortable_columns = ("name", "total")
+        columns = ("pilot_id", "name", "flight_1", "flight_2", "flight_3", "flight_4", "flight_5", "total")
+
         # Configure tags - yellow background for invalid pilots
         self.pilot_tree.tag_configure("invalid", background="#ffff99")
         
         # Configure column headings and centering
         for col in columns:
-            self.pilot_tree.heading(col, text=col.replace("_", " ").title())
-            self.pilot_tree.column(col, width=60 if col != "name" else 120, anchor="center")
+            text = col.replace("_", " ").title()
+            if col in sortable_columns:
+                text = f"⇅ {text}"  # Add sort indicator
+            if col in sortable_columns:
+                self.pilot_tree.heading(col, text=text, command=lambda c=col: self._on_sort(c))
+            else:
+                self.pilot_tree.heading(col, text=text)
+            if col == "pilot_id":
+                self.pilot_tree.column(col, width=0, minwidth=0, stretch=False)  # Hide column
+            else:
+                self.pilot_tree.column(col, width=60 if col != "name" else 120, anchor="center")
 
         # Scrollbar
         scrollbar = ttk.Scrollbar(left_frame, orient="vertical", command=self.pilot_tree.yview)
@@ -238,7 +299,7 @@ class GNZViewer(tk.Tk):
 
         self.pilot_tree.bind("<<TreeviewSelect>>", self._on_pilot_selected)
 
-        self.paned.add(left_frame, weight=1)
+        self.paned.add(left_frame)
 
         # Right: Flight details (5 boxes vertically, scrollable)
         right_frame = tk.Frame(self.paned)
@@ -269,20 +330,19 @@ class GNZViewer(tk.Tk):
 
         self._clear_flight_boxes()
 
-        self.paned.add(right_frame, weight=2)
+        self.paned.add(right_frame)
 
-        # Output log (scrollable, 10 rows)
-        self.output_frame = tk.Frame(self, height=150)
-        self.output_frame.pack(fill="x", padx=10, pady=5)
-        self.output_frame.pack_propagate(False)
+        # Output log - add to vertical paned
+        self.output_frame = tk.Frame(self.vpaned, height=150)
+        self.vpaned.add(self.output_frame)
 
-        tk.Label(self.output_frame, text="Output", font=("Arial", 9, "bold")).pack(anchor="w")
+        tk.Label(self.output_frame, text="Output", font=("Arial", 9, "bold")).pack(anchor="w", padx=5)
 
         self.output_text = tk.Text(self.output_frame, height=10, width=80, wrap="none", font=("Courier", 9))
-        self.output_text.pack(side="left", fill="both", expand=True)
+        self.output_text.pack(side="left", fill="both", expand=True, padx=(5, 0))
 
         output_scrollbar = ttk.Scrollbar(self.output_frame, orient="vertical", command=self.output_text.yview)
-        output_scrollbar.pack(side="right", fill="y")
+        output_scrollbar.pack(side="right", fill="y", padx=(0, 5))
         self.output_text.configure(yscrollcommand=output_scrollbar.set)
 
         # Status bar (thin at bottom)
@@ -292,9 +352,34 @@ class GNZViewer(tk.Tk):
         # Flag to track if window is closing
         self.is_closing = False
         
+        # Sort state
+        self._sort_column = "total"
+        self._sort_reverse = True
+        
         # Track dates from files
         self.north_dates = None
         self.south_dates = None
+
+    def _on_sort(self, column):
+        if self._sort_column == column:
+            self._sort_reverse = not self._sort_reverse
+        else:
+            self._sort_column = column
+            self._sort_reverse = True
+        self._populate_pilot_list()
+        self._update_sort_indicators()
+
+    def _update_sort_indicators(self):
+        sortable_columns = ("name", "total")
+        columns = ("pilot_id", "name", "flight_1", "flight_2", "flight_3", "flight_4", "flight_5", "total")
+        arrow = " ↓" if self._sort_reverse else " ↑"
+        for col in columns:
+            text = col.replace("_", " ").title()
+            if col in sortable_columns:
+                text = f"⇅ {text}"
+            if col == self._sort_column:
+                text += arrow
+            self.pilot_tree.heading(col, text=text)
 
     def _load_data(self):
         # Load pilot data from JSON files, skipping the season dict
