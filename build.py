@@ -8,12 +8,23 @@ import time
 from pathlib import Path
 
 
+def get_version():
+    """Read version from pyproject.toml."""
+    import tomllib
+    project_root = Path(__file__).parent
+    pyproject = project_root / "pyproject.toml"
+    with open(pyproject, "rb") as f:
+        data = tomllib.load(f)
+    return data.get("project", {}).get("version", "0.0.0")
+
+
 def main():
     project_root = Path(__file__).parent
+    version = get_version()
     dist_folder = project_root / "dist"
     release_folder = project_root / "release"
 
-    print("Building WeGlide NZ Client...")
+    print(f"Building WeGlide NZ Client v{version}...")
 
     # Wait a moment to let any processes release the dist folder
     time.sleep(1)
@@ -34,9 +45,9 @@ def main():
         shutil.rmtree(release_folder)
     release_folder.mkdir(exist_ok=True)
 
-    # Copy executable from build_output folder
+    # Copy executable with version in filename
     exe_source = project_root / "build_output" / "gnz-online-scoring.exe"
-    exe_dest = release_folder / "gnz-online-scoring.exe"
+    exe_dest = release_folder / f"gnz-online-scoring-v{version}.exe"
     shutil.copy2(exe_source, exe_dest)
 
     # Copy README
@@ -48,7 +59,7 @@ def main():
     print(f"\nRelease package created at: {release_folder}")
     print(f"\nTo run:")
     print(f"  cd {release_folder}")
-    print("  .\\gnz-online-scoring.exe")
+    print(f"  .\\gnz-online-scoring-v{version}.exe")
 
 
 if __name__ == "__main__":

@@ -199,6 +199,17 @@ class GNZViewer(tk.Tk):
         self.island_dropdown.pack(side="left", padx=5)
         self.island_dropdown.bind("<<ComboboxSelected>>", self._on_island_changed)
 
+        tk.Label(top_frame, text="Hide Invalid:", font=("Arial", 10)).pack(side="left", padx=(20, 2))
+        self.hide_invalid_var = tk.BooleanVar(value=False)
+        self.hide_invalid_checkbox = tk.Checkbutton(
+            top_frame,
+            variable=self.hide_invalid_var,
+            command=self._on_hide_invalid_changed,
+        )
+        self.hide_invalid_checkbox.pack(side="left", padx=2)
+        self.hide_invalid_label = tk.Label(top_frame, text="(->pts<- = invalid, yellow row = has invalid)", font=("Arial", 9), fg="gray")
+        self.hide_invalid_label.pack(side="left", padx=5)
+
         # Main content: PanedWindow for resizable split (vertical - left/right)
         self.paned = ttk.PanedWindow(self, orient="horizontal")
         self.paned.pack(fill="both", expand=True, padx=10, pady=5)
@@ -208,14 +219,17 @@ class GNZViewer(tk.Tk):
 
         tk.Label(left_frame, text="Pilots", font=("Arial", 14, "bold")).pack(anchor="w")
 
-        # Treeview for pilot list (like CSV)
+# Treeview for pilot list (like CSV)
         columns = ("pilot_id", "name", "flight_1", "flight_2", "flight_3", "flight_4", "flight_5", "total")
         self.pilot_tree = ttk.Treeview(left_frame, columns=columns, show="headings", height=20)
 
-        # Configure column headings
+        # Configure tags - yellow background for invalid pilots
+        self.pilot_tree.tag_configure("invalid", background="#ffff99")
+        
+        # Configure column headings and centering
         for col in columns:
             self.pilot_tree.heading(col, text=col.replace("_", " ").title())
-            self.pilot_tree.column(col, width=60 if col != "name" else 120)
+            self.pilot_tree.column(col, width=60 if col != "name" else 120, anchor="center")
 
         # Scrollbar
         scrollbar = ttk.Scrollbar(left_frame, orient="vertical", command=self.pilot_tree.yview)
@@ -399,26 +413,15 @@ class GNZViewer(tk.Tk):
 
             # Import and run the CLI season function
             from main import run_season
-            from pathlib import Path
             from datetime import date
             from config import Config, SeasonConfig, AuthConfig
             
-            # Create config in memory (dates from GUI)
             config = Config(
                 season=SeasonConfig(start_date=date.fromisoformat(start_date), end_date=date.fromisoformat(end_date)),
                 auth=AuthConfig()
             )
             
-            # Save a temp config file for run_season to read
-            import yaml
-            config_path = self.output_path / "temp_config.yaml"
-            with open(config_path, "w") as f:
-                yaml.dump({
-                    "season": {"start_date": start_date, "end_date": end_date},
-                    "auth": {"username": "", "password": ""}
-                }, f)
-            
-            # Run the season (this does all the API calls, pagination, island detection)
+            run_season(config, mock=False, output_dir=self.output_path)
             # Capture stdout to show in GUI
             import sys
             from io import StringIO
@@ -438,7 +441,7 @@ class GNZViewer(tk.Tk):
             sys.stdout = OutputCapture(lambda t: self.after(0, lambda: self._append_output(t)))
             
             try:
-                run_season(config_path, mock=False, output_dir=self.output_path, start_date=start_date, end_date=end_date)
+                run_season(config, mock=False, output_dir=self.output_path)
             finally:
                 sys.stdout = old_stdout
 
@@ -490,7 +493,6 @@ class GNZViewer(tk.Tk):
         self.current_island = self.island_var.get()
         self._populate_pilot_list()
         
-        # Update dates for the selected island
         dates = self.north_dates if self.current_island == "north" else self.south_dates
         if dates:
             self.start_date_entry.config(state="normal")
@@ -501,28 +503,87 @@ class GNZViewer(tk.Tk):
             self.start_date_entry.config(state="disabled", bg="#eee")
             self.end_date_entry.config(state="disabled", bg="#eee")
 
+    def _on_hide_invalid_changed(self):
+        self._populate_pilot_list()
+        
+        # Show/hide the highlight label
+        if not self.hide_invalid_var.get():
+            self.hide_invalid_label.pack(side="left", padx=5)
+        else:
+            self.hide_invalid_label.pack_forget()
+        
+        # Refresh flight details if a pilot is selected
+        selection = self.pilot_tree.selection()
+        if selection:
+            index = self.pilot_tree.index(selection[0])
+            pilots = self.data.get(self.current_island, [])
+            pilots = sorted(pilots, key=lambda p: p.get("total_points", 0), reverse=True)
+            if 0 <= index < len(pilots):
+                pilot = pilots[index]
+                self._show_flight_details(pilot)
+
+    def _filter_flights_for_display(self, flights: list) -> list:
+        """Filter flights for display based on checkbox state.
+        
+        Unchecked (show all): take top 5 by points from stored flights
+        Checked (hide invalid): filter to valid only, take top 5
+        """
+        hide_invalid = self.hide_invalid_var.get()
+        
+        if hide_invalid:
+            # Only valid flights
+            filtered = [f for f in flights if f.get("valid", True)]
+        else:
+            # Show all - just take top 5 by points
+            filtered = flights
+        
+        # Always limit to 5 for display
+        filtered = sorted(filtered, key=lambda f: f.get("points", 0), reverse=True)[:5]
+        return filtered
+
+    def _calculate_display_total(self, flights: list) -> float:
+        """Calculate total points for display."""
+        return sum(f.get("points", 0) for f in flights[:5])
+
     def _populate_pilot_list(self):
-        # Clear existing
         for item in self.pilot_tree.get_children():
             self.pilot_tree.delete(item)
 
         pilots = self.data.get(self.current_island, [])
 
-        # Sort by total_points descending
-        pilots = sorted(pilots, key=lambda p: p.get("total_points", 0), reverse=True)
+        def calc_total(pilot):
+            flights = self._filter_flights_for_display(pilot.get("flights", []))
+            return self._calculate_display_total(flights)
+
+        pilots = sorted(pilots, key=calc_total, reverse=True)
 
         for pilot in pilots:
-            flights = pilot.get("flights", [])
-            flight_points = [str(f.get("points", "")) for f in flights[:5]]
+            flights = self._filter_flights_for_display(pilot.get("flights", []))
+            
+            # Add marks around invalid flight points
+            flight_points = []
+            for f in flights:
+                pts = f.get("points", "")
+                if pts:
+                    if not f.get("valid", True):
+                        pts = f"->{pts}<-"
+                    else:
+                        pts = str(pts)
+                flight_points.append(pts)
+            
+            # Check if any flight is invalid - tag the whole row
+            has_invalid = any(not f.get("valid", True) for f in flights)
+            tag = ("invalid",) if has_invalid else ()
+            
             while len(flight_points) < 5:
                 flight_points.append("")
 
-            total = pilot.get("total_points", "")
+            total = calc_total(pilot)
 
-            self.pilot_tree.insert("", "end", values=[
+            self.pilot_tree.insert("", "end", tags=tag, values=[
                 pilot.get("pilot_id", ""),
                 pilot.get("pilot_name", ""),
-            ] + flight_points + [total])
+            ] + flight_points + [f"{total:.2f}" if total else ""])
 
     def _on_pilot_selected(self, event=None):
         selection = self.pilot_tree.selection()
@@ -530,9 +591,13 @@ class GNZViewer(tk.Tk):
             return
 
         index = self.pilot_tree.index(selection[0])
-        # Use sorted pilots list (same as in _populate_pilot_list)
         pilots = self.data.get(self.current_island, [])
-        pilots = sorted(pilots, key=lambda p: p.get("total_points", 0), reverse=True)
+
+        def calc_total(pilot):
+            flights = self._filter_flights_for_display(pilot.get("flights", []))
+            return self._calculate_display_total(flights)
+
+        pilots = sorted(pilots, key=calc_total, reverse=True)
 
         if 0 <= index < len(pilots):
             pilot = pilots[index]
@@ -545,7 +610,8 @@ class GNZViewer(tk.Tk):
             tk.Label(box, text="Select a pilot", fg="gray").pack(pady=20)
 
     def _show_flight_details(self, pilot: dict):
-        flights = pilot.get("flights", [])
+        # Use filter for display
+        flights = self._filter_flights_for_display(pilot.get("flights", []))
 
         for i, box in enumerate(self.flight_boxes):
             for widget in box.winfo_children():
@@ -558,7 +624,8 @@ class GNZViewer(tk.Tk):
                 tk.Label(box, text="(no flight)", fg="gray").pack(pady=10)
 
     def _render_flight_box(self, box: tk.Frame, flight: dict):
-        # Left side: flight info
+        is_valid = flight.get("valid", True)
+
         info_frame = tk.Frame(box)
         info_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
 
@@ -568,6 +635,7 @@ class GNZViewer(tk.Tk):
         tk.Label(info_frame, text=f"Distance: {flight.get('distance', '')} km").pack(anchor="w")
         tk.Label(info_frame, text=f"Origin: {flight.get('origin', '')}").pack(anchor="w")
         tk.Label(info_frame, text=f"Location: ({flight.get('latitude', ''):.4f}, {flight.get('longitude', ''):.4f})").pack(anchor="w")
+        tk.Label(info_frame, text=f"Valid: {is_valid}").pack(anchor="w")
 
         # Right side: map (300px wide)
         map_width = 300

@@ -13,6 +13,7 @@ When you ask me to create a new version release, I follow this workflow:
 - If not changed: Continue to Step 2
 
 ### Step 2: Commit code changes
+- If pyproject.toml has changes, commit them, except the version line.
 - Run `git status` and `git diff` to see changes
 - Ask user to confirm
 - Propose commit message describing what was implemented (not version number)

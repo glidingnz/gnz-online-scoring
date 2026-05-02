@@ -25,12 +25,14 @@
 
 ### Phase 5: Output
 - [x] CSV: pilot_id, name, Flight 1-5, total
+- [x] CSV (valid only, separate file)
 - [x] JSON: grouped by pilot with flight details + season dates
 - [x] log.txt with run summary
 
 ### Phase 6: Build System
 - [x] PyInstaller build script
 - [x] Single executable in release/
+- [x] Version in filename (v0.2.0)
 
 ### Phase 7: GUI
 - [x] Tkinter GUI viewer
@@ -41,10 +43,14 @@
 - [x] Preloaded maps
 - [x] Scrollable flight details
 - [x] Real-time output during download
+- [x] Flight validity (rank -> valid)
+- [x] Filter invalid flights checkbox
+- [x] Yellow row for invalid pilots
+- [x] ->pts<- markers for invalid flights
 
 ## Build
 
 ```bash
 python build.py
-# Output: release/gnz-online-scoring.exe
+# Output: release/gnz-online-scoring-v0.2.0.exe
 ```

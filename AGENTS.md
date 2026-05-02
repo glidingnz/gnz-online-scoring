@@ -52,6 +52,34 @@ python build.py
 python -m pytest tests/ -v
 ```
 
+## Version Updates
+
+When releasing a new version:
+
+1. See VERSION_CHECKLIST.md for step-by-step
+2. Update `gnz_online_scoring.spec` - change name to include version
+3. Update CHANGELOG.md - add [X.Y.Z] section with date, list changes under Added/Fixed/Changed
+4. Update README.md - update version in header
+5. Update STATUS.md - update "Last updated" date
+6. Run `python build.py`
+
+**Always check VERSION_CHECKLIST.md for the full procedure.**
+
+Quick reference:
+```bash
+# Add new section to CHANGELOG.md:
+## [X.Y.Z] - YYYY-MM-DD
+
+### Added
+- Description
+
+### Fixed
+- Description
+
+### Changed
+- Description
+```
+
 ## Important Notes
 
 - Uses Chrome user-agent header to bypass 403 blocking
@@ -73,3 +101,16 @@ app/
 main.py         - Wrapper entry point (for PyInstaller)
 build.py        - Build script
 ```
+
+## Flight Validity
+
+- WeGlide API provides `rank` field which maps to `valid` boolean
+- Selection: walk through sorted flights until 5th valid included, then stop
+- Invalid flights: marked in GUI with ->pts<-, row highlighted in yellow
+- CSV includes "notes" column listing invalid flight numbers
+
+## CSV Generation
+
+- Points padded to 5 columns (empty string if fewer flights)
+- Total always shown (sum of non-empty, non-zero values)
+- Notes column only populated if invalid flights exist

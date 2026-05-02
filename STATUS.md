@@ -1,6 +1,6 @@
 # Implementation Status
 
-## Current State: Complete ✓
+## Current State: v0.2.0 Complete ✓
 
 ### Source Code
 - `app/` - Main application code
@@ -26,9 +26,16 @@
 3. **Data Processing**
    - Groups flights by pilot and island
    - Each pilot gets top 5 flights per island (sorted by points)
+   - Includes invalid flights if fewer than 5 valid flights available
    - Season dates stored in JSON files
 
-4. **GUI Viewer**
+4. **Flight Validity**
+   - Valid boolean stored in JSON (from WeGlide API)
+   - Invalid flights shown in red in GUI
+   - "Hide Invalid" checkbox to filter invalid flights
+   - Recalculates totals when filtering
+
+5. **GUI Viewer**
    - Pilot list sorted by total points (descending)
    - Island selector (North/South)
    - Date selectors with validation
@@ -37,7 +44,7 @@
    - Preloaded maps for faster UX
    - Scrollable output log during download
 
-5. **Build System**
+6. **Build System**
    - PyInstaller-based executable
    - Single `release/gnz-online-scoring.exe`
 
@@ -47,8 +54,10 @@
 |------|-------------|
 | `north_island.json` | North Island pilots with flights |
 | `south_island.json` | South Island pilots with flights |
-| `north_island.csv` | North Island rankings |
-| `south_island.csv` | South Island rankings |
+| `north_island_all.csv` | North Island rankings (all flights) |
+| `north_island_valid.csv` | North Island rankings (valid only) |
+| `south_island_all.csv` | South Island rankings (all flights) |
+| `south_island_valid.csv` | South Island rankings (valid only) |
 | `unmapped.json` | Flights not in polygons |
 | `errors.txt` | Unmapped flight list |
 | `log.txt` | Run summary |
@@ -66,8 +75,12 @@ python build.py
 # Download data
 python main.py --cli --start-date 2024-10-01 --end-date 2025-03-31
 
-# View data
+# View data (with GUI)
 python main.py
 ```
 
-Last updated: 2026-05-01
+## Recent Fixes
+
+- **2026-05-03**: CSV totals now show correctly when pilots have fewer than 5 flights (points padded to 5 columns, total calculated from non-empty values)
+
+Last updated: 2026-05-03 (v0.2.0 - CSV bug fix: totals now show when fewer than 5 flights)

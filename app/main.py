@@ -14,9 +14,10 @@ _app_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _app_path)
 sys.path.insert(0, os.path.join(_app_path, 'app'))
 
-from config import load_config
+from config import Config
 from api_client import WeGlideClient
 from polygons import get_island_from_polygon
+from selection import select_top_flights
 
 
 MAX_FLIGHTS_PER_PILOT_ISLAND = 5
@@ -27,16 +28,8 @@ def get_island(lat: float, lon: float) -> str | None:
     return get_island_from_polygon(lat, lon)
 
 
-def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = None, start_date: str = None, end_date: str = None):
+def run_season(config, mock: bool = False, output_dir: Path | None = None):
     """Run the season analysis."""
-    config = load_config(config_path)
-    
-    # Override dates if provided
-    if start_date:
-        config.season.start_date = start_date
-    if end_date:
-        config.season.end_date = end_date
-    
     print(f"Season: {config.season.start_date} to {config.season.end_date}")
 
     if mock:
@@ -94,10 +87,9 @@ def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = 
         pilot_names[flight.user_id] = flight.user_name
         pilot_flights[flight.user_id][island].append(flight)
 
-    for pilot_id in pilot_flights:
+    for pilot_id, islands in pilot_flights.items():
         for island in ["north", "south"]:
-            pilot_flights[pilot_id][island].sort(key=lambda f: f.points, reverse=True)
-            pilot_flights[pilot_id][island] = pilot_flights[pilot_id][island][:MAX_FLIGHTS_PER_PILOT_ISLAND]
+            pilot_flights[pilot_id][island] = select_top_flights(pilot_flights[pilot_id][island], MAX_FLIGHTS_PER_PILOT_ISLAND)
 
     north_data = []
     south_data = []
@@ -112,6 +104,7 @@ def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = 
                 "date": flight.date,
                 "points": flight.points,
                 "distance": flight.distance,
+                "valid": flight.valid,
                 "origin": flight.airport.name if flight.airport else "Unknown",
                 "latitude": flight.airport.latitude if flight.airport else 0,
                 "longitude": flight.airport.longitude if flight.airport else 0,
@@ -124,6 +117,7 @@ def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = 
                 "date": flight.date,
                 "points": flight.points,
                 "distance": flight.distance,
+                "valid": flight.valid,
                 "origin": flight.airport.name if flight.airport else "Unknown",
                 "latitude": flight.airport.latitude if flight.airport else 0,
                 "longitude": flight.airport.longitude if flight.airport else 0,
@@ -135,8 +129,8 @@ def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = 
 
     north_json = output_dir / "north_island.json"
     south_json = output_dir / "south_island.json"
-    north_csv = output_dir / "north_island.csv"
-    south_csv = output_dir / "south_island.csv"
+    north_csv = output_dir / "north_island_all.csv"
+    south_csv = output_dir / "south_island_all.csv"
 
     north_by_pilot = defaultdict(list)
     for row in north_data:
@@ -157,6 +151,7 @@ def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = 
                     "date": f["date"],
                     "points": f["points"],
                     "distance": f["distance"],
+                    "valid": f["valid"],
                     "origin": f["origin"],
                     "latitude": f["latitude"],
                     "longitude": f["longitude"],
@@ -189,21 +184,68 @@ def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = 
             f.write(f"  Pilot: {uf['pilot_name']} ({uf['pilot_id']}), Date: {uf['date']}\n")
     print(f"Written {errors_file}")
 
-    for csv_file, data in [(north_csv, north_data), (south_csv, south_data)]:
-        if data:
-            pilot_rows = defaultdict(list)
-            for row in data:
-                pilot_rows[row["pilot_id"]].append(row["points"])
-            with open(csv_file, "w", newline="", encoding="utf-8") as f:
+    def write_csv(csv_path: Path, data: list[dict], include_invalid: bool = True):
+        """Write CSV file. If include_invalid is False, only valid flights."""
+        if include_invalid:
+            filtered = data
+        else:
+            filtered = [r for r in data if r.get("valid", True)]
+        
+        if filtered:
+            pilot_data = defaultdict(lambda: {"points": [], "valid": []})
+            for row in filtered:
+                pid = row["pilot_id"]
+                pilot_data[pid]["points"].append(row["points"])
+                pilot_data[pid]["valid"].append(row.get("valid", True))
+            
+            with open(csv_path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
-                writer.writerow(["pilot_id", "name", "Flight 1", "Flight 2", "Flight 3", "Flight 4", "Flight 5", "total"])
-                for pilot_id, points in sorted(pilot_rows.items()):
+                if include_invalid:
+                    writer.writerow(["pilot_id", "name", "Flight 1", "Flight 2", "Flight 3", "Flight 4", "Flight 5", "total", "notes"])
+                else:
+                    writer.writerow(["pilot_id", "name", "Flight 1", "Flight 2", "Flight 3", "Flight 4", "Flight 5", "total"])
+                for pilot_id in sorted(pilot_data.keys()):
+                    pd = pilot_data[pilot_id]
                     name = pilot_names.get(pilot_id, f"Pilot {pilot_id}")
-                    row = [pilot_id, name] + points[:5]
-                    total = sum(p for p in points[:5] if p)
+                    
+                    # Get first 5 flights
+                    points = pd["points"][:5]
+                    valid = pd["valid"][:5]
+                    
+                    # Pad to 5 flights
+                    while len(points) < 5:
+                        points.append("")
+                        valid.append(True)
+                    
+                    row = [pilot_id, name] + points
+                    total = sum(p for p in points if isinstance(p, (int, float)) and p)
                     row.append(f"{total:.2f}")
+                    
+                    if include_invalid:
+                        # Find which flights are invalid
+                        invalid_indices = [i+1 for i, v in enumerate(valid) if not v]
+                        if invalid_indices:
+                            flight_word = "Flight" if len(invalid_indices) == 1 else "Flights"
+                            notes = f"{flight_word} " + "; ".join(str(i) for i in invalid_indices) + " invalid!"
+                        else:
+                            notes = ""
+                        row.append(notes)
+                    
                     writer.writerow(row)
-        print(f"Written {csv_file}")
+            return len(filtered)
+        return 0
+
+    north_csv = output_dir / "north_island_all.csv"
+    south_csv = output_dir / "south_island_all.csv"
+
+    write_csv(north_csv, north_data, include_invalid=True)
+    print(f"Written {north_csv}")
+    write_csv(north_csv.parent / "north_island_valid.csv", north_data, include_invalid=False)
+    print(f"Written {north_csv.parent / 'north_island_valid.csv'}")
+    write_csv(south_csv, south_data, include_invalid=True)
+    print(f"Written {south_csv}")
+    write_csv(south_csv.parent / "south_island_valid.csv", south_data, include_invalid=False)
+    print(f"Written {south_csv.parent / 'south_island_valid.csv'}")
 
     print(f"\nSummary:")
     print(f"  North Island: {len(north_data)} flights from {len(set(d['pilot_id'] for d in north_data))} pilots")
@@ -224,8 +266,10 @@ def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = 
         f.write(f"  - {north_json.name}\n")
         f.write(f"  - {south_json.name}\n")
         f.write(f"  - {unmapped_json.name}\n")
-        f.write(f"  - {north_csv.name}\n")
-        f.write(f"  - {south_csv.name}\n")
+        f.write(f"  - {north_csv.name} (all flights)\n")
+        f.write(f"  - north_island_valid.csv (valid only)\n")
+        f.write(f"  - {south_csv.name} (all flights)\n")
+        f.write(f"  - south_island_valid.csv (valid only)\n")
         f.write(f"  - {errors_file.name}\n")
         f.write(f"  - {log_file.name}\n")
     print(f"Written {log_file}")
@@ -234,7 +278,6 @@ def run_season(config_path: Path, mock: bool = False, output_dir: Path | None = 
 def main(args=None):
     parser = argparse.ArgumentParser(description="GNZ Online Scoring")
     parser.add_argument("--cli", action="store_true", help="Run in CLI mode (no GUI)")
-    parser.add_argument("--config", default="config.yaml", help="Config file path (CLI mode)")
     parser.add_argument("--mock", action="store_true", help="Use mock data (CLI mode)")
     parser.add_argument("--output-dir", type=Path, help="Output directory (CLI mode)")
     parser.add_argument("--start-date", help="Season start date (YYYY-MM-DD)")
@@ -242,14 +285,22 @@ def main(args=None):
     args = parser.parse_args(args)
 
     if args.cli:
-        # Run CLI mode
-        config_path = Path(args.config)
-        if not config_path.exists():
-            print(f"Config file not found: {config_path}", file=sys.stderr)
+        from datetime import date
+        from config import Config, SeasonConfig, AuthConfig
+
+        if not args.start_date or not args.end_date:
+            print("Error: --start-date and --end-date are required in CLI mode", file=sys.stderr)
             sys.exit(1)
-        run_season(config_path, mock=args.mock, output_dir=args.output_dir, start_date=args.start_date, end_date=args.end_date)
+
+        config = Config(
+            season=SeasonConfig(
+                start_date=date.fromisoformat(args.start_date),
+                end_date=date.fromisoformat(args.end_date),
+            ),
+            auth=AuthConfig(),
+        )
+        run_season(config, mock=args.mock, output_dir=args.output_dir)
     else:
-        # Run GUI mode
         from gui import main as gui_main
         gui_main()
 

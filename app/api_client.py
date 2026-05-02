@@ -38,6 +38,7 @@ class APIFlight:
     date: str = ""
     points: float = 0.0
     distance: float = 0.0
+    valid: bool = True
     airport: APIAirport | None = None
     club_id: int | None = None
 
@@ -167,67 +168,69 @@ class WeGlideClient:
                 filtered = [f for f in filtered if f.club_id == club_id]
             return filtered[:limit]
 
-        api = self._get_flight_api()
-        params = {"limit": limit, "country_id_in": "NZ", "skip": offset}
-        if date_from:
-            params["scoring_date_start"] = date_from
-        if date_to:
-            params["scoring_date_end"] = date_to
-        if user_id:
-            params["user_id_in"] = str(user_id)
-        if club_id:
-            params["club_id_in"] = str(club_id)
-
-        url = f"{self.host}/v1/flight"
-        headers = {"User-Agent": DEFAULT_USER_AGENT}
-        if self._token:
-            headers["Authorization"] = f"Bearer {self._token}"
-
-        try:
+        def fetch_page(limit: int, offset: int) -> list:
+            params = {"limit": limit, "country_id_in": "NZ", "skip": offset}
+            if date_from:
+                params["scoring_date_start"] = date_from
+            if date_to:
+                params["scoring_date_end"] = date_to
+            if user_id:
+                params["user_id_in"] = str(user_id)
+            if club_id:
+                params["club_id_in"] = str(club_id)
+            
+            url = f"{self.host}/v1/flight"
+            headers = {"User-Agent": DEFAULT_USER_AGENT}
+            if self._token:
+                headers["Authorization"] = f"Bearer {self._token}"
+            
             response = requests.get(url, params=params, headers=headers, timeout=30)
             response.raise_for_status()
-            flights_data = response.json()
-            if isinstance(flights_data, list):
-                flights = []
-                for f in flights_data:
-                    airport_data = f.get("takeoff_airport", {})
-                    airport_id = airport_data.get("id", 0) if airport_data else 0
+            return response.json()
 
-                    # Try to get actual airport coordinates from API
-                    lat, lon = 0.0, 0.0
-                    if airport_id:
-                        coords = self.get_airport_coords(airport_id)
-                        if coords:
-                            lat, lon = coords
-                        else:
-                            # Fallback to bbox if airport lookup fails
-                            bbox = f.get("bbox", [])
-                            lat = bbox[1] if len(bbox) > 1 else 0.0
-                            lon = bbox[0] if len(bbox) > 0 else 0.0
+        def parse_flights(flights_data: list) -> list:
+            if not isinstance(flights_data, list):
+                return []
+            flights = []
+            for f in flights_data:
+                airport_data = f.get("takeoff_airport", {})
+                airport_id = airport_data.get("id", 0) if airport_data else 0
 
-                    airport = APIAirport(
-                        id=airport_id,
-                        name=airport_data.get("name", "Unknown") if airport_data else "Unknown",
-                        latitude=lat,
-                        longitude=lon,
-                    ) if airport_id else None
-                    contest = f.get("contest", {})
-                    club_data = f.get("club", {})
-                    flight = APIFlight(
-                        id=f.get("id", 0),
-                        user_id=f.get("user", {}).get("id", 0),
-                        user_name=f.get("user", {}).get("name", ""),
-                        date=f.get("scoring_date", ""),
-                        points=contest.get("points", 0.0),
-                        distance=contest.get("distance", 0.0),
-                        airport=airport,
-                        club_id=club_data.get("id") if club_data else None,
-                    )
-                    flights.append(flight)
-                return flights
-            raise APIError(f"Unexpected response format: {type(flights_data)}")
-        except requests.RequestException as e:
-            raise APIError(f"Failed to fetch flights: {e}")
+                lat, lon = 0.0, 0.0
+                if airport_id:
+                    coords = self.get_airport_coords(airport_id)
+                    if coords:
+                        lat, lon = coords
+                    else:
+                        bbox = f.get("bbox", [])
+                        lat = bbox[1] if len(bbox) > 1 else 0.0
+                        lon = bbox[0] if len(bbox) > 0 else 0.0
+
+                airport = APIAirport(
+                    id=airport_id,
+                    name=airport_data.get("name", "Unknown") if airport_data else "Unknown",
+                    latitude=lat,
+                    longitude=lon,
+                ) if airport_id else None
+                contest = f.get("contest", {})
+                club_data = f.get("club", {})
+                
+                flight = APIFlight(
+                    id=f.get("id", 0),
+                    user_id=f.get("user", {}).get("id", 0),
+                    user_name=f.get("user", {}).get("name", ""),
+                    date=f.get("scoring_date", ""),
+                    points=contest.get("points", 0.0),
+                    distance=contest.get("distance", 0.0),
+                    valid=f.get("rank", True),
+                    airport=airport,
+                    club_id=club_data.get("id") if club_data else None,
+                )
+                flights.append(flight)
+            return flights
+
+        data = fetch_page(limit, offset)
+        return parse_flights(data)
 
     def get_all_flights(
         self,
