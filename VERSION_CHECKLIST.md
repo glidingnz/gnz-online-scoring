@@ -40,10 +40,20 @@ Propose to user: "Based on the changes since v0.2.0, I suggest [X.Y.Z]. Does tha
 ## Step 5: Update docs
 
 ```bash
-# CHANGELOG.md - Move [Unreleased] to [X.Y.Z] with date
+# CHANGELOG.md - Move [Unreleased] to [X.Y.Z] with date, add your changes UNDER the version heading
 # README.md - Update version in header
 # STATUS.md - Update "Last updated" date
 ```
+
+### CHANGELOG.md Format Rules:
+- Entries are ordered newest to oldest (0.4.0 → 0.3.0 → ... → 0.1.0)
+- **Never delete old version sections** - they stay there for historical record
+- Under each version heading, use three subsections:
+  - `### Added` - for new features
+  - `### Changed` - for modifications to existing functionality
+  - `### Fixed` - for bug fixes
+- If a version has no entries in a category, omit that category
+- Write entries as: `- concise description of change`
 
 ## Step 6: Build
 
