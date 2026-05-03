@@ -83,4 +83,4 @@ python main.py
 
 - **2026-05-03**: CSV totals now show correctly when pilots have fewer than 5 flights (points padded to 5 columns, total calculated from non-empty values)
 
-Last updated: 2026-05-03 (v0.3.0)
+Last updated: 2026-05-03 (v0.4.0)

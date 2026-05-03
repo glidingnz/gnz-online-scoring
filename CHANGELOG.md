@@ -19,20 +19,30 @@ All notable changes to GNZ Online Scoring will be documented in this file.
 ### Fixed
 - Remove duplicate run_season call in GUI download (was running twice)
 
-## [0.3.0] - 2026-05-03
+## [0.4.0] - 2026-05-03
 
 ### Added
-- Hide pilot ID column in pilots table
-- Sortable indicators on name and total columns (⇅ prefix)
-- Resizable split between pilots panel and output
-- Visible sashes with styled handles (raised, 4px wide)
-- Save and restore window layout on close/open
-- Pilot name shown in Flight Details header
+- Clickable flight cells open flight URL in browser
+- Cursor changes to hand when hovering over clickable text
+- Cell highlighting with ==><== markers on hover (preserves -> invalid markers)
+- Blue underlined styling on flight columns for clickable indication
+- Pad points and totals to 2 decimal places for consistent display
 
 ### Changed
 - Sort order now affects flight details selection
 
 ### Fixed
+- Sorting by name now works correctly (flight details follow pilot selection order)
+
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+### Changed
+
+## [0.2.0]
 - Sorting by name now works correctly (flight details follow pilot selection order)
 
 ## [Unreleased]
