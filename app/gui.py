@@ -245,7 +245,7 @@ class GNZViewer(tk.Tk):
             command=self._on_hide_invalid_changed,
         )
         self.hide_invalid_checkbox.pack(side="left", padx=2)
-        self.hide_invalid_label = tk.Label(top_frame, text="(->pts<- = invalid, yellow row = has invalid)", font=("Arial", 9), fg="gray")
+        self.hide_invalid_label = tk.Label(top_frame, text="(->pts<- = invalid, yellow row = has invalid. Click on flight cell to open in WeGlide)", font=("Arial", 9))
         self.hide_invalid_label.pack(side="left", padx=5)
 
         # Vertical PanedWindow for resizable rows (top: pilots+flights, bottom: output)
@@ -275,6 +275,7 @@ class GNZViewer(tk.Tk):
 
         # Configure tags - yellow background for invalid pilots
         self.pilot_tree.tag_configure("invalid", background="#ffff99")
+        self.pilot_tree.tag_configure("hover", background="blue")
         
         # Configure column headings and centering
         for col in columns:
@@ -356,6 +357,7 @@ class GNZViewer(tk.Tk):
         # Sort state
         self._sort_column = "total"
         self._sort_reverse = True
+        self._hovered_cell = None  # Track hovered cell for hover effect
         
         # Track dates from files
         self.north_dates = None
@@ -656,15 +658,17 @@ class GNZViewer(tk.Tk):
             for f in flights:
                 pts = f.get("points", "")
                 if pts:
+                    pts = f"{float(pts):.2f}"
                     if not f.get("valid", True):
                         pts = f"->{pts}<-"
-                    else:
-                        pts = str(pts)
                 flight_points.append(pts)
             
             # Check if any flight is invalid - tag the whole row
             has_invalid = any(not f.get("valid", True) for f in flights)
-            tag = ("invalid",) if has_invalid else ()
+            if has_invalid:
+                tag = ("invalid",)
+            else:
+                tag = ()
             
             while len(flight_points) < 5:
                 flight_points.append("")
@@ -674,7 +678,110 @@ class GNZViewer(tk.Tk):
             self.pilot_tree.insert("", "end", tags=tag, values=[
                 pilot.get("pilot_id", ""),
                 pilot.get("pilot_name", ""),
-            ] + flight_points + [f"{total:.2f}" if total else ""])
+            ] + flight_points + [f"{total:.2f}" if total else "0.00"])
+
+        # Bind click event for flight columns
+        self.pilot_tree.bind("<Button-1>", self._on_flight_click)
+        self.pilot_tree.bind("<Motion>", self._on_flight_motion)
+
+    def _on_flight_motion(self, event):
+        region = self.pilot_tree.identify("region", event.x, event.y)
+        if region != "cell":
+            self._clear_hover()
+            return
+
+        col = self.pilot_tree.identify_column(event.x)
+        if col not in ("#3", "#4", "#5", "#6", "#7"):
+            self._clear_hover()
+            return
+
+        element = self.pilot_tree.identify_element(event.x, event.y)
+        if element and "text" in str(element):
+            self.pilot_tree.configure(cursor="hand2")
+            self._apply_hover(event)
+        else:
+            self.pilot_tree.configure(cursor="")
+            self._clear_hover()
+
+    def _apply_hover(self, event):
+        row = self.pilot_tree.identify_row(event.y)
+        col = self.pilot_tree.identify_column(event.x)
+        if not row or not col:
+            return
+        cell = (row, col)
+        if cell == self._hovered_cell:
+            return
+        self._clear_hover()
+        self._hovered_cell = cell
+        
+        col_index = int(col[1:]) - 1
+        values = list(self.pilot_tree.item(row, "values"))
+        v = values[col_index]
+        is_empty = v == ""
+        if (is_empty):
+            return
+        # Store original for restore (check for ->x<- wrapping)
+        is_invalid = v and v.startswith("->")
+        if is_invalid:
+            v = v[2:-2]  # Strip -> and <-
+        
+        values[col_index] = f"==>{v}<=="
+        self.pilot_tree.item(row, values=values)
+
+    def _clear_hover(self):
+        if self._hovered_cell:
+            row, col = self._hovered_cell
+            col_index = int(col[1:]) - 1
+            values = list(self.pilot_tree.item(row, "values"))
+            v = values[col_index]
+            if v and v.startswith("==>"):
+                v = v[3:-3]
+                # Check if this was an invalid flight in original data
+                # We need to check the pilot's flight data
+                pilot_index = self.pilot_tree.index(row)
+                pilots = self.data.get(self.current_island, [])
+                pilots = self._sort_pilots(pilots)
+                if pilot_index < len(pilots):
+                    pilot = pilots[pilot_index]
+                    flights = self._filter_flights_for_display(pilot.get("flights", []))
+                    flight_index = col_index - 2  # col_index 2-6 = flight 0-4
+                    if 0 <= flight_index < len(flights):
+                        if not flights[flight_index].get("valid", True):
+                            v = f"->{v}<-"
+            values[col_index] = v
+            self.pilot_tree.item(row, values=values)
+            self._hovered_cell = None
+
+    def _on_flight_click(self, event):
+        region = self.pilot_tree.identify("region", event.x, event.y)
+        if region != "cell":
+            return
+
+        col = self.pilot_tree.identify_column(event.x)
+        if col not in ("#3", "#4", "#5", "#6", "#7"):
+            return
+
+        row = self.pilot_tree.identify_row(event.y)
+        if not row:
+            return
+
+        index = self.pilot_tree.index(row)
+        pilots = self.data.get(self.current_island, [])
+        pilots = self._sort_pilots(pilots)
+        if index >= len(pilots):
+            return
+
+        pilot = pilots[index]
+        flights = self._filter_flights_for_display(pilot.get("flights", []))
+        flight_index = int(col[1:]) - 3
+        if flight_index >= len(flights):
+            return
+
+        flight = flights[flight_index]
+        flight_id = flight.get("flight_id")
+        if flight_id:
+            import webbrowser
+            webbrowser.open(f"https://weglide.org/flight/{flight_id}")
 
     def _on_pilot_selected(self, event=None):
         selection = self.pilot_tree.selection()
